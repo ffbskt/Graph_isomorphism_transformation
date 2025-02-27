@@ -2,7 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
-from graph_constants import (
+from graph_constants_ai import (
     NODE_SHAPES, GRAPHVIZ_COLORS, 
     DEFAULT_NODE_CONFIGS, DEFAULT_EDGE_CONFIGS,
     LAYOUT_CONFIGS

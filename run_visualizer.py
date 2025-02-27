@@ -1,6 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from graph_from_image import img2graph, add_special_nodes, get_default_special_nodes
+from graph_from_image import img2graph_binary, add_special_nodes, get_default_special_nodes
 from graph_visualization import GraphVisualizer
 
 # Create a 5x5 image with 1s and 0s
@@ -13,7 +13,7 @@ img = np.array([
 ], dtype=np.uint8)
 
 # Convert image to graph
-G = img2graph(img)
+G = img2graph_binary(img)
 
 # Get default special nodes and edges configuration
 special_nodes, special_edges = get_default_special_nodes(G)
