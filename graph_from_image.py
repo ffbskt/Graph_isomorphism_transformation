@@ -73,18 +73,18 @@ def img2graph(img):
     
     return G
 
-def add_special_nodes(G, n_classes=1, start_node='s'):
+def add_special_nodes(G, special_nodes, special_edges):
     """
-    Add special nodes (type1) and their edges to the graph.
+    Add special nodes and their edges to the graph.
     
     Parameters:
     -----------
     G : networkx.DiGraph
         Input graph to add nodes to
-    n_classes : int
-        Number of class nodes to add
-    start_node : str
-        Name of the start node
+    special_nodes : list of tuples
+        List of (node_id, node_attributes) tuples to add
+    special_edges : list of tuples
+        List of (source, target, edge_attributes) tuples to add
         
     Returns:
     --------
@@ -92,23 +92,50 @@ def add_special_nodes(G, n_classes=1, start_node='s'):
         Graph with added special nodes and edges
     """
     # Add special nodes
-    G.add_node('s', type='type1', label='Start')
-    G.add_node('b', type='type1', label='Boundary')
+    G.add_nodes_from(special_nodes)
+    
+    # Add special edges
+    G.add_edges_from(special_edges)
+    
+    return G
+
+def get_default_special_nodes(G):
+    """
+    Get default special nodes and edges configuration.
+    
+    Parameters:
+    -----------
+    G : networkx.DiGraph
+        Input graph to configure special nodes for
+        
+    Returns:
+    --------
+    tuple
+        (special_nodes, special_edges) where:
+        - special_nodes is a list of (node_id, node_attributes) tuples
+        - special_edges is a list of (source, target, edge_attributes) tuples
+    """
+    special_nodes = [
+        ('s', {'type': 'type1', 'label': 'Start'}),
+        ('b', {'type': 'type1', 'label': 'Boundary'}),
+        ('c_0', {'type': 'type2', 'label': 'Class0'})
+    ]
+    
+    special_edges = []
     
     # Connect boundary to pixels with value 1
     for node in G.nodes():
         if node.startswith('p_') and G.nodes[node]['label'] == '1':
-            G.add_edge(node, 'b', type='black')
-            G.add_edge('b', node, type='black')
+            special_edges.extend([
+                (node, 'b', {'type': 'black'}),
+                ('b', node, {'type': 'black'})
+            ])
     
     # Add start node connection
-    G.add_edge('s', 'p_1_0', type='black')
-    G.add_edge('p_1_0', 's', type='black')
+    special_edges.extend([
+        ('s', 'p_1_0', {'type': 'black'}),
+        ('p_1_0', 's', {'type': 'black'}),
+        ('s', 'c_0', {'type': 'black'})
+    ])
     
-    # Add class nodes
-    for i in range(n_classes):
-        class_node = f'c_{i}'
-        G.add_node(class_node, type='type2', label=f'Class{i}')
-        G.add_edge(start_node, class_node, type='black')
-    
-    return G
+    return special_nodes, special_edges
