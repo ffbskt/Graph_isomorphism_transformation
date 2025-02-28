@@ -1,0 +1,96 @@
+Metadata-Version: 2.1
+Name: visg
+Version: 0.1.0
+Summary: A graph visualization package for image-based graphs
+Home-page: https://github.com/yourusername/visg
+Author: Your Name
+Author-email: your.email@example.com
+Classifier: Programming Language :: Python :: 3
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Operating System :: OS Independent
+Requires-Python: >=3.7
+Description-Content-Type: text/markdown
+License-File: LICENSE
+
+# VisG - Graph Visualization Package
+
+VisG is a Python package for converting images to graph representations and visualizing them with various layouts and styles.
+
+## Features
+
+- Convert binary images to graph representations
+- Multiple layout options (grid, spring, Hamiltonian, etc.)
+- Customizable node and edge styles
+- Special node handling for image-based graphs
+- Easy-to-use visualization interface
+
+## Installation
+
+```bash
+pip install visg
+```
+
+## Usage
+
+Here's a simple example of how to use VisG:
+
+```python
+from visg import VisG
+import cv2
+
+# Create a VisG instance
+vis = VisG()
+
+# Load and convert an image to a graph
+img = cv2.imread('your_image.png', cv2.IMREAD_GRAYSCALE)
+G = vis.img2graph(img)
+
+# Add special nodes (start, boundary, class nodes)
+vis.add_special_nodes()
+
+# Draw the graph with grid layout
+vis.draw(layout='grid_square', title='Image Graph')
+vis.show()
+```
+
+### Available Layouts
+
+- `grid_square`: Arranges nodes in a grid pattern (best for image-based graphs)
+- `spring`: Force-directed layout
+- `circular`: Circular layout
+- `random`: Random layout
+- `shell`: Shell layout
+- `spectral`: Spectral layout
+- `kamada_kawai`: Kamada-Kawai layout
+- `planar`: Planar layout
+- `hamiltonian`: Physics-based layout using Hamiltonian optimization
+
+### Customization
+
+You can customize node and edge appearances by providing custom configurations:
+
+```python
+custom_node_configs = {
+    'T': {
+        'shape': 'triangle',
+        'color': 'red',
+        'size': 600
+    }
+}
+
+vis = VisG(node_configs=custom_node_configs)
+```
+
+## Requirements
+
+- Python 3.7+
+- NetworkX
+- Matplotlib
+- NumPy
+- OpenCV
+- scikit-learn
+- tqdm
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

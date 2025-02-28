@@ -1,0 +1,12 @@
+LICENSE
+README.md
+setup.py
+visg/__init__.py
+visg/constants.py
+visg/layouts.py
+visg/visg.py
+visg.egg-info/PKG-INFO
+visg.egg-info/SOURCES.txt
+visg.egg-info/dependency_links.txt
+visg.egg-info/requires.txt
+visg.egg-info/top_level.txt
