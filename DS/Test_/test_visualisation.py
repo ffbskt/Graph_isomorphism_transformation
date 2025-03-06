@@ -1,13 +1,30 @@
 import unittest
 import numpy as np
 import networkx as nx
-from Visualisation.visg import VisG
 import matplotlib.pyplot as plt
+import sys
+import os
+
+# Add the project root directory to Python path
+#sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+from Visualisation.visg import VisG
 
 class TestVisG(unittest.TestCase):
-    def setUp(self):
-        """Set up test fixtures before each test method."""
-        self.visg = VisG()
+    _visg = None
+    
+    @classmethod
+    def setUpClass(cls):
+        """Set up test fixtures before all tests."""
+        if cls._visg is None:
+            cls._visg = VisG()
+    
+    @property
+    def visg(self):
+        """Ensure visg is initialized."""
+        if self._visg is None:
+            self.__class__.setUpClass()
+        return self._visg
         
     def test_simple_graph_visualization(self):
         """Test creating and visualizing a simple graph."""
@@ -31,8 +48,7 @@ class TestVisG(unittest.TestCase):
             plt.figure(figsize=(8, 6))
             self.visg.get_layout(layout=layout)
             self.visg.draw(title=f"Test Graph with {layout} layout")
-            plt.savefig(f"Test/test_graph_{layout}.png")
-            plt.close()
+            plt.show()
             
     def test_special_nodes(self):
         """Test adding special nodes to the graph."""
@@ -52,8 +68,14 @@ class TestVisG(unittest.TestCase):
         plt.figure(figsize=(8, 6))
         self.visg.get_layout(layout='spring')
         self.visg.draw(title="Graph with Special Nodes")
-        plt.savefig("Test/test_graph_special_nodes.png")
-        plt.close()
+        plt.show()
+
+def run_tests():
+    """Run the tests directly."""
+    test = TestVisG()
+    TestVisG.setUpClass()
+    test.test_simple_graph_visualization()
+    test.test_special_nodes()
 
 if __name__ == '__main__':
-    unittest.main() 
+    run_tests()
