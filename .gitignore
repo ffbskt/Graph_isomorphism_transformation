@@ -37,3 +37,8 @@ Test/*.png
 # Jupyter Notebook
 .ipynb_checkpoints 
 DS/Temp/Priv_version.py
+.specstory/history/2025-03-06_12-36-initializing-git-repository-and-testing-visg.md
+.specstory/history/2025-03-07_14-28-fixing-import-issues-in-python.md
+
+spectrum/
+.specstory/

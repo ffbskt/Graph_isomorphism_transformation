@@ -63,4 +63,9 @@ def create_pattern(phead, pbase, edges):
     for node in phead.nodes():
         P.add_edge('H', node, type='hierarchy', label='1')
     P.add_edge('B', 'H', type=1, label='1')
+    # add in graph data pbase, phead, B index U index
+    P.graph['pbase'] = pbase
+    P.graph['phead'] = phead
+    P.graph['iB'] = 'B'
+    P.graph['iH'] = 'H'
     return P

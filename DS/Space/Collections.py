@@ -197,6 +197,12 @@ class GraphCollection:
             label='l'
         )
 
+    def reindex_pattern(self, P, reindex_map):
+        P.graph['pbase'] = nx.relabel_nodes(P.graph['pbase'], reindex_map)
+        P.graph['phead'] = nx.relabel_nodes(P.graph['phead'], reindex_map)
+        P.graph['iB'] = reindex_map[P.graph['iB']]
+        P.graph['iH'] = reindex_map[P.graph['iH']]
+        return P
     
     def add_graph_to_collection(self, G, label=None, is_pattern=False):
         """Adds a graph to the graph collection as new subgraph.
@@ -211,7 +217,9 @@ class GraphCollection:
         reindex_map = {old: self.NC.add_new_node(G.nodes[old]) for old in G.nodes()}
         G_reindexed = nx.relabel_nodes(G, reindex_map)
         self.G.update(G_reindexed)
-        self.add_label(G_reindexed, label)
+        # self.add_label(G_reindexed, label)
+        if is_pattern:
+            G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
         return G_reindexed, reindex_map
     
     def subgraph_with_neighbors(self, node_list, G=None, depth=1, only_out_edges=False, remove_nodes=[]):

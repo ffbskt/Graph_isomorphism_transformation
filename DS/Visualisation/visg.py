@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import numpy as np
 import cv2
+import os
 
 from .constants import (
     NODE_SHAPES, GRAPHVIZ_COLORS, 
@@ -340,4 +341,92 @@ class VisG:
         
     def save(self, filename):
         """Save the graph visualization to a file."""
-        plt.savefig(filename, bbox_inches='tight', dpi=300) 
+        plt.savefig(filename, bbox_inches='tight', dpi=300)
+        plt.close()
+        
+    @classmethod
+    def visualize_transformation(cls, graph, pattern, result, test_name):
+        """
+        Visualize the graph transformation process with three subplots and save to file.
+        All visualizations will be saved in a single file, arranged vertically.
+
+        Args:
+            graph (nx.DiGraph): Initial graph
+            pattern (nx.DiGraph): Pattern graph
+            result (nx.DiGraph): Resulting graph after transformation
+            test_name (str): Name of the test for the title
+        """
+        # Create figure for this test
+        fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+
+        # Initial graph
+        vis1 = cls()
+        vis1.add_graph(graph)
+        vis1.draw(layout='spring', title='Initial Graph', ax=ax1)
+
+        # Pattern graph
+        vis2 = cls()
+        vis2.add_graph(pattern)
+        vis2.draw(layout='spring', title='Pattern', ax=ax2)
+
+        # Result graph
+        vis3 = cls()
+        vis3.add_graph(result)
+        vis3.draw(layout='spring', title='Result Graph', ax=ax3)
+
+        plt.suptitle(test_name)
+        plt.tight_layout()
+
+        # Save the visualization to file
+        output_dir = "test_data"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # Create a filename for the combined image
+        combined_path = os.path.join(output_dir, "combined_transformations.png")
+        
+        # Store figures as a class variable
+        if not hasattr(cls, 'figures'):
+            cls.figures = []
+        
+        # Store the current figure
+        cls.figures.append((fig, test_name))
+        
+        # If this is the last test (checking if we're in the main test sequence)
+        if "end" in test_name:
+            # Create a new figure for all tests combined
+            n_tests = len(cls.figures)
+            combined_fig = plt.figure(figsize=(18, 5 * n_tests))
+            
+            # Add each test visualization as a subplot
+            for i, (test_fig, title) in enumerate(cls.figures):
+                # Get the test figure canvas
+                canvas = test_fig.canvas
+                canvas.draw()
+                
+                # Create new subplot in the combined figure
+                ax = combined_fig.add_subplot(n_tests, 1, i + 1)
+                
+                # Remove axes
+                ax.axis('off')
+                
+                # Add the test figure as an image
+                img = np.frombuffer(canvas.tostring_rgb(), dtype='uint8')
+                img = img.reshape(canvas.get_width_height()[::-1] + (3,))
+                ax.imshow(img)
+                ax.set_title(title)
+                
+                # Close the individual test figure
+                plt.close(test_fig)
+            
+            # Save the combined figure
+            combined_fig.tight_layout()
+            combined_fig.savefig(combined_path, bbox_inches='tight', dpi=300)
+            plt.close(combined_fig)
+            
+            # Clear the stored figures
+            cls.figures = []
+            
+            print(f"Saved combined visualization to {combined_path}")
+        else:
+            print(f"Added {test_name} to combined visualization") 
