@@ -1,103 +1,19 @@
-import sys
 import os
 import random
-import datetime
-# sys.path.append(r'C:\Users\Denis\PycharmProjects\Graph_isomorphism_transformation\visg')
-from Visualisation.visg import VisG
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque
 import numpy as np
-
+import Space.Collections as spc
+import Space.Creations as create
+from Visualisation.visg import VisG
 random.seed(1)
+NC = spc.NodeCollection()
+GC = spc.GraphCollection(NC=NC)
 
 
-def create_random_graph(num_nodes, num_edges, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
-    """
-    Create a random graph with specified number of nodes and edges, with random types and labels
-
-    Args:
-        num_nodes (int): Number of nodes
-        num_edges (int): Number of edges
-        node_types (list): List of possible node types/labels
-        edge_types (list): List of possible edge types/labels
-        node_labels (list): List of possible node labels
-        edge_labels (list): List of possible edge labels
-    Returns:
-        dict: Graph representation with nodes and edges
-    """
-    if node_types is None:
-        node_types = ['a', 'b', 'c']
-    if node_labels is None:
-        node_labels = ['a', 'b', 'c']
-    if edge_types is None:
-        edge_types = [1, 2, 3]
-    if node_labels is None:
-        node_labels = ['a', 'b', 'c']
-
-    # Create a random graph
-    G = nx.DiGraph()
-
-    # Add nodes
-    for i in range(num_nodes):
-        node_type = random.choice(node_types)
-        node_label = random.choice(node_labels)
-        G.add_node(i, type=node_type, label=node_label)
-
-        # Add edges
-    for i in range(num_edges):
-        src = random.randint(0, num_nodes - 1)
-        dst = random.randint(0, num_nodes - 1)
-        edge_type = random.choice(edge_types)
-        edge_label = random.choice(edge_labels)
-        G.add_edge(src, dst, type=edge_type, label=edge_label)
-
-    return G
 
 
-def create_pattern(phead, pbase, edges):
-    """
-    !! correct pattern should have only all replacement edges from one node or all addedges..
-    In other case we do not know remove or not gnode.
-    """
-    P = nx.compose(phead, pbase)
-    P.add_edges_from(edges)
-    P.add_node('B', type='base', label='B')
-    for node in pbase.nodes():
-        P.add_edge('B', node, type='hierarchy', label='1')
-    P.add_node('H', type='head', label='H')
-    for node in phead.nodes():
-        P.add_edge('H', node, type='hierarchy', label='1')
-    P.add_edge('B', 'H', type=1, label='1')
-    return P
-
-
-def subgraph_with_neighbors(G, node_list, depth=1, only_out_edges=False):
-    nodes_to_add = set(node_list)
-
-    for node in node_list:
-        queue = deque([(node, 0)])
-
-        while queue:
-            current_node, current_depth = queue.popleft()
-
-            if current_depth < depth:
-                neighbors = list(G.neighbors(current_node))
-
-                if not only_out_edges:
-                    # Also considering parents as well as children by looking at predecessor nodes
-                    predecessors = list(G.predecessors(current_node))
-                    neighbors.extend(predecessors)
-
-                for neighbor in neighbors:
-                    if neighbor not in nodes_to_add:
-                        nodes_to_add.add(neighbor)
-                        queue.append((neighbor, current_depth + 1))
-
-    if only_out_edges:
-        nodes_to_add = nodes_to_add - set(node_list)
-
-    return G.subgraph(nodes_to_add)
 
 
 def find_isomorphisms(pattern_base, G, node_match=None, edge_match=None):
@@ -142,20 +58,23 @@ def replace_by_isomorphism(pattern, G, iso):
                                                              'hierarchy'})  # replace all edges in and out of bnode to gnode
         if replace:
             G.remove_node(gnode)
-        # print('replace', replace, G.nodes(data=True), G.edges(data=True))
-    pbase = subgraph_with_neighbors(G, ['B', ], depth=1)
+    
+    # Get the base pattern nodes to remove
+    pbase = GC.subgraph_with_neighbors(node_list=['B'], G=pattern, depth=1)
     nodes_to_remove = list(pbase.nodes())
-    # print('nodes_to_remove', nodes_to_remove)
     G.remove_nodes_from(nodes_to_remove)
-
-    # print('G', G.edges(data=True), G.nodes(data=True))
 
 
 def apply_pattern(pattern, G):
     """
     Apply pattern to G
     """
-    for iso in find_isomorphisms(pattern, G):
+    # Get the base pattern by getting subgraph around node 'B'
+    pbase = GC.subgraph_with_neighbors(node_list=['B'], G=pattern, depth=1, remove_nodes=['B', 'H'])
+    # find L-P
+    # print('pbase', pbase.nodes(data=True), pbase.edges(data=True))
+    for iso in list(find_isomorphisms(pbase, G)):
+        # print('iso', iso, G.nodes(data=True), G.edges(data=True))
         replace_by_isomorphism(pattern, G, iso)
 
 
@@ -208,7 +127,7 @@ def visualize_transformation(graph, pattern, result, test_name):
     visualize_transformation.figures.append((fig, test_name))
     
     # If this is the last test (checking if we're in the main test sequence)
-    if "Test 4:" in test_name or "Test 5:" in test_name:
+    if "end" in test_name:
         # Create a new figure for all tests combined
         n_tests = len(visualize_transformation.figures)
         combined_fig = plt.figure(figsize=(18, 5 * n_tests))
@@ -246,10 +165,6 @@ def visualize_transformation(graph, pattern, result, test_name):
     else:
         print(f"Added {test_name} to combined visualization")
 
-# def visualize_transformation(graph, pattern, result, test_name):
-#     """Alias for visualize_transformation2 for backward compatibility."""
-#     return visualize_transformation2(graph, pattern, result, test_name)
-
 
 def create_test_graph(type='linear'):
     # Create test graph
@@ -285,13 +200,13 @@ def test_single_node_replacement_linear(graph2=create_test_graph(type='linear'),
     # Create pattern
     pbase, phead = nx.DiGraph(), nx.DiGraph()
     pbase.add_nodes_from([(10, {'type': 'T', 'label': 'a'})])
-    phead.add_nodes_from([(11, {'type': 'F', 'label': 'b'})])
-    pattern = create_pattern(phead, pbase, [(10, 11, {'type': 'replacement', 'label': '1'})])
+    phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
+    pattern = create.create_pattern(phead, pbase, [(10, 11, {'type': 'replacement', 'label': '1'})])
 
     # Create expected result
     result_graph = nx.DiGraph()
     result_graph.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
         (1, {'type': 'b', 'label': 'b'}),
         (2, {'type': 'c', 'label': 'c'}),
     ])
@@ -318,11 +233,11 @@ def test_multiple_node_replacement(graph2=create_test_graph(type='linear'), visu
     pbase, phead = nx.DiGraph(), nx.DiGraph()
     pbase.add_nodes_from([(10, {'type': 'T', 'label': 'a'})])
     phead.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
-        (12, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
     ])
     phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
-    pattern = create_pattern(phead, pbase, [
+    pattern = create.create_pattern(phead, pbase, [
         (10, 11, {'type': 'replacement', 'label': '1'}),
         (10, 12, {'type': 'replacement', 'label': '1'})
     ])
@@ -330,8 +245,8 @@ def test_multiple_node_replacement(graph2=create_test_graph(type='linear'), visu
     # Create expected result
     result_graph = nx.DiGraph()
     result_graph.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
-        (12, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
         (1, {'type': 'b', 'label': 'b'}),
         (2, {'type': 'c', 'label': 'c'}),
     ])
@@ -360,13 +275,13 @@ def test_node_addition(graph2=create_test_graph(type='linear'), visualize=False)
     # Create pattern
     pbase, phead = nx.DiGraph(), nx.DiGraph()
     pbase.add_nodes_from([(10, {'type': 'T', 'label': 'a'})])
-    phead.add_nodes_from([(11, {'type': 'F', 'label': 'b'})])
-    pattern = create_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'})])
+    phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
+    pattern = create.create_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'})])
 
     # Create expected result
     result_graph = nx.DiGraph()
     result_graph.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
         (0, {'type': 'a', 'label': 'a'}),
         (1, {'type': 'b', 'label': 'b'}),
         (2, {'type': 'c', 'label': 'c'}),
@@ -395,11 +310,11 @@ def test_multiple_node_addition(graph2=create_test_graph(type='linear'), visuali
     pbase, phead = nx.DiGraph(), nx.DiGraph()
     pbase.add_nodes_from([(10, {'type': 'T', 'label': 'a'})])
     phead.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
-        (12, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
     ])
     phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
-    pattern = create_pattern(phead, pbase, [
+    pattern = create.create_pattern(phead, pbase, [
         (10, 11, {'type': 1, 'label': '1'}),
         (10, 12, {'type': 1, 'label': '1'})
     ])
@@ -407,8 +322,8 @@ def test_multiple_node_addition(graph2=create_test_graph(type='linear'), visuali
     # Create expected result
     result_graph = nx.DiGraph()
     result_graph.add_nodes_from([
-        (11, {'type': 'F', 'label': 'b'}),
-        (12, {'type': 'F', 'label': 'b'}),
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
         (0, {'type': 'a', 'label': 'a'}),
         (1, {'type': 'b', 'label': 'b'}),
         (2, {'type': 'c', 'label': 'c'}),
@@ -447,25 +362,21 @@ if __name__ == "__main__":
         result = test_func(test_graph, visualize=True)
         print(f"{test_name}: {'PASSED' if result else 'FAILED'}")
 
-    G = nx.DiGraph()
-    G.add_nodes_from([(0, {'type': 'a', 'label': 'a'}),
-                      (1, {'type': 'b', 'label': 'b'}),
-                      (2, {'type': 'a', 'label': 'a'}),
-                      ])
-    G.add_edges_from([(0, 1, {'type': 1, 'label': '1'}),
-                      (2, 0, {'type': 1, 'label': '1'}),
-                      (1, 2, {'type': 1, 'label': '1'}),
-                      ])
+    G = create_test_graph(type='linear')
 
     phead, pbase = nx.DiGraph(), nx.DiGraph()
-    phead.add_nodes_from([(10, {'type': 'T', 'label': 'a'}),
-                          (11, {'type': 'F', 'label': 'b'}),
+    phead.add_nodes_from([(10, {'type': 'T', 'label': 'aa'}),
+                          (11, {'type': 'F', 'label': 'bb'}),
                           ])
     phead.add_edges_from([(10, 11, {'type': 1, 'label': '1'}),
                           ])
-    # pattern = create_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'}),])
-    # apply_pattern(pattern, G)
-    # visualize_transformation(G, pattern, G, "Test 5: Multiple Node Addition")
+    pbase.add_nodes_from([(12, {'type': 'T', 'label': 'a'}),
+                          ])
+    pattern = create.create_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'}),
+                                            (12, 10, {'type':1, 'label': 'e'})])
+    G_copy = G.copy()
+    apply_pattern(pattern, G)
+    visualize_transformation(G_copy, pattern, G, "Test 5: Multiple Node Addition end")
 
 
 

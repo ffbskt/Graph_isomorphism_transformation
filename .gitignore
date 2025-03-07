@@ -36,3 +36,4 @@ Test/*.png
 
 # Jupyter Notebook
 .ipynb_checkpoints 
+DS/Temp/Priv_version.py
