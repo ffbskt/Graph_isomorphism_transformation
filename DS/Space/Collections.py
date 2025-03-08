@@ -62,7 +62,7 @@ class NodeCollection:
         self.nodes_collection[node_id] = node_data
         
         # Register node properties for quick lookup
-        print(node_data, self.label2nodes)
+        # print(node_data, self.label2nodes)
         for data_name in ['type', 'label']:
             if data_name in node_data:
                 getattr(self, data_name + '2nodes')[node_data[data_name]].append(node_id)
@@ -189,9 +189,10 @@ class GraphCollection:
             self.G.add_edge(graph_id, node, type=EDGE_TYPES['HIERARCHY'], label='')
             
         # Connect to label hierarchy
-        print(self.NC.label2nodes, SINGLETON_TYPES['LABEL'], self.NC.label2nodes[SINGLETON_TYPES['LABEL']])
+        assert len(self.NC.label2nodes[SINGLETON_TYPES['LABEL']]) == 1, f"Label '{label}' has more than one node or not initializ by init graph"
+        # print(self.NC.label2nodes, SINGLETON_TYPES['LABEL'], self.NC.label2nodes[SINGLETON_TYPES['LABEL']])
         self.G.add_edge(
-            self.NC.label2nodes[SINGLETON_TYPES['LABEL'] + '^'][0], 
+            self.NC.label2nodes[SINGLETON_TYPES['LABEL']][0], 
             graph_id, 
             type=EDGE_TYPES['LABEL'], 
             label='l'
@@ -217,7 +218,7 @@ class GraphCollection:
         reindex_map = {old: self.NC.add_new_node(G.nodes[old]) for old in G.nodes()}
         G_reindexed = nx.relabel_nodes(G, reindex_map)
         self.G.update(G_reindexed)
-        # self.add_label(G_reindexed, label)
+        #self.add_label(G_reindexed, label)
         if is_pattern:
             G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
         return G_reindexed, reindex_map

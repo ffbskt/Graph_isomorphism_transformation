@@ -17,21 +17,50 @@ GC = GraphCollection(NC=NC)
 
 class Transformation:
     """Class to handle graph transformations with patterns"""
-    
+    # ?? Add visualize with depth, G location of nearest nodes to pattern and transform procecces.
     def __init__(self, pattern):
+        from DS.Space.Matching import edge_none_match, node_none_match
+        from DS.Space.Collections import GraphCollection
         """
         Initialize transformation with a pattern
         
         Args:
             pattern (nx.DiGraph): Pattern graph with base and head
-        """
+        """        
         self.pattern = pattern
-        self.pbase = pattern.graph.get('pbase', None)
-        self.phead = pattern.graph.get('phead', None)
-        self.iB = pattern.graph.get('iB', 'B')
-        self.iH = pattern.graph.get('iH', 'H')
+        self.n_m = node_none_match
+        self.e_m = edge_none_match
+        # self._init_pattern(pattern)
+
+    def _init_pattern(self):
+        """
+        Initialize the pattern
+        """
+        self.pbase = self.pattern.graph.get('pbase', None)
+        self.phead = self.pattern.graph.get('phead', None)
+        self.iB = self.pattern.graph.get('iB', 'B')
+        self.iH = self.pattern.graph.get('iH', 'H')
+
+    def renew_iso(self, iso, reindex_map):
+        new_iso = {}
+        for old, new in iso.items():
+            new_iso[old] = reindex_map[new]
+        return new_iso
         
-    def transform(self, G, visualize=False):
+    
+    def apply_pattern(self, G, iso):
+        """
+        Apply the transformation pattern to graph G
+        """
+        P_copy = self.pattern.copy()
+        P_copy, reindex_map = GC.add_graph_to_collection(P_copy, label=None, is_pattern=True)
+        iso = self.renew_iso(iso, reindex_map)
+        G = nx.relabel_nodes(G, iso, copy=False) # add base instead of Gisonodes      
+
+        
+
+        
+    def transform(self, G, number_of_transformations=1, visualize=False):
         """
         Apply the transformation pattern to graph G
         
@@ -42,13 +71,20 @@ class Transformation:
         Returns:
             nx.DiGraph: Transformed graph
         """
-        G_copy = G.copy()
-        apply_pattern(self.pattern, G)
+        iso = nx.algorithms.isomorphism.DiGraphMatcher(G, self.pbase, node_match=self.n_m, edge_match=self.e_m).subgraph_isomorphisms_iter()
+
+        for iso in list(find_isomorphisms(self.pbase, G))[:number_of_transformations]:
+            self.apply_pattern(G, iso)
+
         
-        if visualize:
-            VisG.visualize_transformation(G_copy, self.pattern, G, "Graph Transformation")
+        
+        # G_copy = G.copy()
+        # apply_pattern(self.pattern, G)
+        
+        # if visualize:
+        #     VisG.visualize_transformation(G_copy, self.pattern, G, "Graph Transformation")
             
-        return G
+        # return G
 
 
 def find_isomorphisms(pattern_base, G, node_match=None, edge_match=None):
@@ -104,7 +140,7 @@ def apply_pattern(pattern, G):
     Apply pattern to G
     """
     # Get the base pattern by getting subgraph around node 'B'
-    pbase = GC.subgraph_with_neighbors(node_list=['B'], G=pattern, depth=1, remove_nodes=['B', 'H'])
+    pbase = pattern.graph['pbase']
     # find L-P
     # print('pbase', pbase.nodes(data=True), pbase.edges(data=True))
     for iso in list(find_isomorphisms(pbase, G)):
@@ -240,8 +276,10 @@ def test_node_addition(graph2=create_test_graph(type='linear'), visualize=False)
 
     # Apply transformation
     graph2_copy = graph2.copy()
-    iso = list(find_isomorphisms(pbase, graph2))[0]
-    replace_by_isomorphism(pattern, graph2, iso)
+    #iso = list(find_isomorphisms(pbase, graph2))[0]
+    #replace_by_isomorphism(pattern, graph2, iso)
+    T = Transformation(pattern)
+    T.transform(graph2)
 
     # Visualize
     if visualize:
@@ -311,18 +349,23 @@ def test_GC():
     G_reindexed, G_reindex_map = GC.add_graph_to_collection(G, label='test', is_pattern=False)
     P_reindexed, P_reindex_map = GC.add_graph_to_collection(pattern, label='test_pattern', is_pattern=True)
     
-    print('\nPattern Base:')
-    print(f"Nodes: {list(P_reindexed.graph['pbase'].nodes(data=True))}")
-    print(f"Edges: {list(P_reindexed.graph['pbase'].edges(data=True))}")
+    assert P_reindexed.nodes(data=True)[P_reindexed.graph['iB']]['type'] == 'base'
+    assert P_reindexed.nodes(data=True)[P_reindexed.graph['iH']]['type'] == 'head'
+    assert len(GC.G.nodes) == len(G.nodes) + len(pattern.nodes)
+    # GC.add_label(G_reindexed, 'test')
+
+    # print('\nPattern Base:')
+    # print(f"Nodes: {list(P_reindexed.graph['pbase'].nodes(data=True))}")
+    # print(f"Edges: {list(P_reindexed.graph['pbase'].edges(data=True))}")
     
-    print('\nPattern Head:')
-    print(f"Nodes: {list(P_reindexed.graph['phead'].nodes(data=True))}")
-    print(f"Edges: {list(P_reindexed.graph['phead'].edges(data=True))}")
-    print(P_reindexed.graph['iB'], P_reindexed.graph['iH'], P_reindexed.nodes(data=True))
+    # print('\nPattern Head:')
+    # print(f"Nodes: {list(P_reindexed.graph['phead'].nodes(data=True))}")
+    # print(f"Edges: {list(P_reindexed.graph['phead'].edges(data=True))}")
+    # print(P_reindexed.graph['iB'], P_reindexed.graph['iH'], P_reindexed.nodes(data=True))
     
-    print('\nGraph:')
-    print(f"Nodes: {list(G_reindexed.nodes(data=True))}")
-    print(f"Edges: {list(G_reindexed.edges(data=True))}")
+    # print('\nGraph:')
+    # print(f"Nodes: {list(G_reindexed.nodes(data=True))}")
+    # print(f"Edges: {list(G_reindexed.edges(data=True))}")
     
     return G_reindexed, P_reindexed
 
