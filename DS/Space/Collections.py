@@ -1,6 +1,7 @@
 import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque, defaultdict
+from DS.Space.Matching import edge_none_match, node_none_match
 import copy
 import random
 random.seed(1)
@@ -140,7 +141,14 @@ class GraphCollection:
         self.G = nx.DiGraph()
         self.label2graphs = {}
         self.label2hierarchy = defaultdict(list) # one label could be word or set of words  # Maps hierarchy level to node ID
-           
+
+    def clear(self):
+        self.NC = NodeCollection()
+        self.G = nx.DiGraph()
+        self.label2graphs = {}
+        self.label2hierarchy = defaultdict(list) # one label could be word or set of words  # Maps hierarchy level to node ID
+        
+
     def add_node(self, node_data):
         indx = self.NC.add_new_node(node_data)
         self.G.add_node(indx, **node_data)
@@ -161,7 +169,6 @@ class GraphCollection:
             
             if data['type'] in ['B', 'H']:
                 self.G.add_edge(graph_id, node, type=EDGE_TYPES['HIERARCHY'], label='')
-
 
 
     def add_label(self, G, label=None): # add type G/P
@@ -268,6 +275,99 @@ class GraphCollection:
         nodes_to_add = nodes_to_add - set(remove_nodes) # remove nodes from nodes_to_add mostly do not include start of search
 
         return G.subgraph(nodes_to_add)
+
+    # __________________________Transformations_________________________
+
+    def renew_iso(self, iso, reindex_map):
+        new_iso = {}
+        for old, new in iso.items():
+            new_iso[old] = reindex_map[new]
+        return new_iso
+
+
+    
+    def apply_pattern(self, pattern, iso):
+        """
+        Apply the transformation pattern to graph G
+        """
+        P_copy_as_graph = pattern.copy()
+        # remove B, H nodes from pattern
+        P_copy_as_graph.remove_nodes_from(['B', 'H'])
+        _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
+        iso = self.renew_iso(iso, reindex_map)
+        print('-------------Iso', iso, reindex_map)
+        #print('-------------G', self.G.nodes(data=True))
+        nx.relabel_nodes(self.G, iso, copy=False) # add base instead of Gisonodes  
+        #print('-------------G new', self.G.nodes(data=True))
+        self.execute_spetial_rules(pattern, reindex_map)
+
+    def transfer_data(self, src_node, dst_node, head=True):
+        if head:
+            if dst_node['type'] == '^X':
+                dst_node['type'] = src_node['type']
+            if dst_node['label'] == '^X':
+                dst_node['label'] = src_node['label']
+        else: # mean base
+            if dst_node['type'] == None:
+                dst_node['type'] = src_node['type']
+            if dst_node['label'] == None:
+                dst_node['label'] = src_node['label']
+
+    def update_pairs(self, pairs, base_ind, head_ind):
+        updated_pairs = []
+        for pair in pairs:
+            updated_pair = tuple(head_ind if value == base_ind else value for value in pair)
+            updated_pairs.append(updated_pair)
+        return updated_pairs
+            
+
+    def execute_spetial_rules(self, pattern, reindex_map):
+        """
+        replacement - take data from phead node, remove pbase, save edges.
+        """
+        #reverse_iso = {v: k for k, v in iso.items()}
+        #print('------execute_spetial_rules-------reverse_iso', reverse_iso) 
+        nx.relabel_nodes(pattern, reindex_map, copy=False)
+        nx.relabel_nodes(pattern.graph['pbase'], reindex_map, copy=False)
+        edges_to_replace = defaultdict(list)
+        data_to_add = {}
+        for e, d in pattern.edges(data=True):
+            if d['type'] == 'replacement':
+                # edges to add, all edges of e[0] node
+                edges_to_replace[(e[0], e[1])].extend(list(self.G.edges(e[0])))
+                # data to add, all data of e[1] node
+                self.transfer_data(self.G.nodes[e[0]], self.G.nodes[e[1]], head=True)
+        edges_to_add = []
+        for k, v in edges_to_replace.items():
+            edges_to_add.extend(self.update_pairs(v, k[0], k[1]))
+        # add edges to G
+        for e in edges_to_add:
+            self.G.add_edge(e[0], e[1])
+        # remove edges from G
+        for k, v in edges_to_replace.items():
+            self.G.remove_edges_from(v)
+
+            # replace each edge in v[i] == k[0] to k[1]
+
+
+        
+    def transform(self, pattern, number_of_transformations=1, visualize=False):
+        """
+        Apply the transformation pattern to graph G
+        
+        Args:
+            G (nx.DiGraph): Graph to transform
+            visualize (bool): Whether to visualize the transformation
+            
+        Returns:
+            nx.DiGraph: Transformed graph
+        """
+        pbase = pattern.graph['pbase']
+        isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
+        for iso in list(isomorphisms)[:number_of_transformations]:
+            #print('Isomorphisms', G.nodes(data=True), pbase.nodes(data=True), list(isomorphisms))
+            print('_____________Iso', iso)
+            self.apply_pattern(pattern, iso)
 
     
    # This wrong method, isomorphism instead is correct. (iso base: node-^X type...)

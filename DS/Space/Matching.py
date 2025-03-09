@@ -4,50 +4,49 @@
 
 
 
-def nml(self, node1, node2):
+def nml(node1, node2):
     """Node match by label."""
     return node1['label'] == node2['label']
 
-def eml(self, edge1, edge2):
+def eml(edge1, edge2):
     """Edge match by label."""
     return edge1['label'] == edge2['label']
 
-def nmt(self, node1, node2):
+def nmt(node1, node2):
     """Node match by type."""
     return node1['type'] == node2['type']
 
-def emt(self, edge1, edge2):
+def emt(edge1, edge2):
     """Edge match by type."""
     return edge1['type'] == edge2['type']
 
-def nmlt(self, node1, node2):
+def nmlt(node1, node2):
     """Node match by label and type."""
     return (node1['type'] == node2['type'] and 
             node1['label'] == node2['label'])
 
-def emlt(self, edge1, edge2):
+def emlt(edge1, edge2):
     """Edge match by label and type."""
     return (edge1['type'] == edge2['type'] and 
             edge1['label'] == edge2['label'])
 
 
-def much_ture_if_none(test_value, default_value):
-    return True if test_value is None else test_value == default_value
-
-
-def edge_none_match(edge, elabel=None, etype=None):
-    """Edge match by label and type. If None always Match."""
-
-    if (much_ture_if_none(elabel, G.edges[edge]['label']) 
-        and much_ture_if_none(etype, G.edges[edge]['type'])):
+def match_true_if_none(test_value, default_value):
+    """Returns True if test_value is None or matches default_value."""
+    # If either value is None, return True (None matches anything)
+    if test_value is None:
         return True
-    return False
-    
-
-def node_none_match(node, label=None, type=None):
-    """Node match by label and type. If None always Match."""
-    
-    if (much_ture_if_none(label, G.nodes[node]['label']) 
-        and much_ture_if_none(type, G.nodes[node]['type'])):
+    if default_value is None:
         return True
-    return False
+    # Otherwise, check for equality
+    return test_value == default_value
+
+def edge_none_match(edge1, edge2):
+    """Edge match by label and type. If None, always matches."""
+    return (match_true_if_none(edge1.get('label'), edge2.get('label')) and
+            match_true_if_none(edge1.get('type'), edge2.get('type')))
+
+def node_none_match(node1, node2):
+    """Node match by label and type. If None, always matches."""
+    return (match_true_if_none(node1.get('label'), node2.get('label')) and
+            match_true_if_none(node1.get('type'), node2.get('type')))

@@ -8,7 +8,7 @@ import os
 # Add the project root directory to Python path
 #sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from Visualisation.visg import VisG
+from DS.Visualisation.visg import VisG
 
 class TestVisG(unittest.TestCase):
     _visg = None
