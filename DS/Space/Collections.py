@@ -23,6 +23,11 @@ EDGE_TYPES = {
     'TRANSFORMATION HORIZONTAL': 'th'
 }
 
+COMAND_EDGE_TYPES = {
+    'replacement': 'r',
+    'replacement_in': 'ri',
+    'replacement_out': 'ro'
+}
 
 
 class NodeCollection:
@@ -295,12 +300,9 @@ class GraphCollection:
         P_copy_as_graph.remove_nodes_from(['B', 'H'])
         _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
         iso = self.renew_iso(iso, reindex_map)
-        print('-------------Iso', iso, reindex_map)
-        #print('-------------G', self.G.nodes(data=True))
         nx.relabel_nodes(self.G, iso, copy=False) # add base instead of Gisonodes  
-        #print('-------------G new', self.G.nodes(data=True))
         self.execute_spetial_rules(pattern, reindex_map)
-
+        
     def transfer_data(self, src_node, dst_node, head=True):
         if head:
             if dst_node['type'] == '^X':
@@ -325,32 +327,50 @@ class GraphCollection:
         """
         replacement - take data from phead node, remove pbase, save edges.
         """
-        #reverse_iso = {v: k for k, v in iso.items()}
-        #print('------execute_spetial_rules-------reverse_iso', reverse_iso) 
         nx.relabel_nodes(pattern, reindex_map, copy=False)
         nx.relabel_nodes(pattern.graph['pbase'], reindex_map, copy=False)
         edges_to_replace = defaultdict(list)
-        data_to_add = {}
-        for e, d in pattern.edges(data=True):
-            if d['type'] == 'replacement':
-                # edges to add, all edges of e[0] node
-                edges_to_replace[(e[0], e[1])].extend(list(self.G.edges(e[0])))
-                # data to add, all data of e[1] node
-                self.transfer_data(self.G.nodes[e[0]], self.G.nodes[e[1]], head=True)
-        edges_to_add = []
-        for k, v in edges_to_replace.items():
-            edges_to_add.extend(self.update_pairs(v, k[0], k[1]))
-        # add edges to G
-        for e in edges_to_add:
-            self.G.add_edge(e[0], e[1])
-        # remove edges from G
-        for k, v in edges_to_replace.items():
-            self.G.remove_edges_from(v)
-
-            # replace each edge in v[i] == k[0] to k[1]
-
-
+        nodes_to_remove = set()
         
+        # First, find all replacement edges and mark nodes for removal
+        for u, v, d in list(pattern.edges(data=True)):
+            if d['type'] == 'replacement':
+                # Remove the replacement edge from the pattern so it doesn't get added to G
+                
+                nodes_to_remove.add(u)
+                self.transfer_data(self.G.nodes[u], self.G.nodes[v], head=True)
+                
+                # Store all incoming edges to base node
+                for pred in list(self.G.predecessors(u)):
+                    edge_data = self.G.get_edge_data(pred, u)
+                    if edge_data['type'] not in COMAND_EDGE_TYPES:
+                        edges_to_replace[(u, v)].append(('in', pred, edge_data))
+                    
+                
+                # Store all outgoing edges from base node
+                for succ in list(self.G.successors(u)):
+                    edge_data = self.G.get_edge_data(u, succ)
+                    if edge_data['type'] not in COMAND_EDGE_TYPES:
+                        edges_to_replace[(u, v)].append(('out', succ, edge_data))
+                    
+         # Process each replacement pair
+        for (base_node, head_node), edges_list in edges_to_replace.items():
+            # Add new edges
+            for direction, other_node, edge_data in edges_list:
+                if direction == 'in':
+                    # Add edge from predecessor to head node
+                    if other_node != head_node:  # Prevent self-loops
+                        self.G.add_edge(other_node, head_node, **edge_data)
+                else:  # direction == 'out'
+                    # Add edge from head node to successor
+                    if other_node != head_node:  # Prevent self-loops
+                        self.G.add_edge(head_node, other_node, **edge_data)
+        
+        # Remove base nodes that were replaced (this will also remove all their edges)
+        for node in nodes_to_remove:
+            if node in self.G:
+                self.G.remove_node(node)
+
     def transform(self, pattern, number_of_transformations=1, visualize=False):
         """
         Apply the transformation pattern to graph G
@@ -366,7 +386,7 @@ class GraphCollection:
         isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
         for iso in list(isomorphisms)[:number_of_transformations]:
             #print('Isomorphisms', G.nodes(data=True), pbase.nodes(data=True), list(isomorphisms))
-            print('_____________Iso', iso)
+            #print('_____________Iso', iso)
             self.apply_pattern(pattern, iso)
 
     
