@@ -1,10 +1,11 @@
 import networkx as nx
 import random
+import numpy as np
 
 
 
 
-def create_random_graph(num_nodes, num_edges, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
+def create_random_graph(num_nodes=2, num_edges=1, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
     """
     Create a random graph with specified number of nodes and edges, with random types and labels
     
@@ -19,13 +20,13 @@ def create_random_graph(num_nodes, num_edges, node_types=None, edge_types=None, 
         dict: Graph representation with nodes and edges
     """
     if node_types is None:
-        node_types = ['a', 'b', 'c']
+        node_types = ['T']
     if node_labels is None:
         node_labels = ['a', 'b', 'c']
     if edge_types is None:
-        edge_types = [1, 2, 3]
+        edge_types = ['1',]
     if edge_labels is None:
-        edge_labels = ['a', 'b', 'c']
+        edge_labels = ['1']
 
     # Create a random graph
     G = nx.DiGraph()
@@ -48,7 +49,7 @@ def create_random_graph(num_nodes, num_edges, node_types=None, edge_types=None, 
     return G
 
 
-def create_pattern(phead, pbase, edges):
+def compose_pattern(phead, pbase, edges):
     """
     reolacement - should be parametr of edges between childs B and H
     !! correct pattern should have only all replacement edges from one node or all addedges..
@@ -69,3 +70,33 @@ def create_pattern(phead, pbase, edges):
     P.graph['iB'] = 'B'
     P.graph['iH'] = 'H'
     return P
+
+def create_random_edge_list(base_nodes, head_nodes):
+    label_type = np.random.choice(np.array(['replacement', '1'], dtype=object))
+    number_of_edges = np.random.randint(1, len(head_nodes))
+    edges = []
+    for i in range(number_of_edges):
+        src = np.random.choice(base_nodes)
+        dst = np.random.choice(head_nodes)
+        edges.append((src, dst, {'type': label_type}))
+    return edges
+
+def create_random_pattern(num_phead_nodes=2, num_pbase_nodes=1, num_edges_head=2, num_edges_base=0, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
+    phead = create_random_graph(num_phead_nodes, num_edges_head, node_types, edge_types, node_labels, edge_labels)
+    pbase = create_random_graph(num_pbase_nodes, num_edges_base, node_types, edge_types, node_labels, edge_labels)
+    
+    # Ensure phead node indices are greater than pbase
+    max_pbase_index = max(pbase.nodes) if pbase.nodes else -1
+    phead = nx.relabel_nodes(phead, lambda x: x + max_pbase_index + 1)
+    
+    # Create random links between phead and pbase
+    for _ in range(num_edges):
+        u = random.choice(list(pbase.nodes))
+        v = random.choice(list(phead.nodes))
+        edge_type = random.choice(['replacement', '1'])
+        edge_label = random.choice(['1'])
+        phead.add_edge(u, v, type=edge_type, label=edge_label)
+
+    edges = create_random_edge_list(pbase.nodes(), phead.nodes())
+    return compose_pattern(phead, pbase, edges)
+

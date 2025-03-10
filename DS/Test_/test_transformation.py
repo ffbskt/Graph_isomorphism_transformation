@@ -2,7 +2,7 @@ import unittest
 import networkx as nx
 import random
 from DS.Space.Collections import GraphCollection, NodeCollection
-from DS.Space.Creations import create_pattern
+from DS.Space.Creations import compose_pattern
 from DS.Visualisation.visg import VisG
 from DS.main import create_test_graph, diff_graphs
 
@@ -27,7 +27,7 @@ class TestTransformation(unittest.TestCase):
         pbase, phead = nx.DiGraph(), nx.DiGraph()
         pbase.add_nodes_from([(10, {'type': None, 'label': 'a'})])
         phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
-        pattern = create_pattern(phead, pbase, [(10, 11, {'type': 'replacement', 'label': 'Re'})])
+        pattern = compose_pattern(phead, pbase, [(10, 11, {'type': 'replacement', 'label': 'Re'})])
 
         # Apply transformation
         graph2_copy = graph2.copy()
@@ -77,7 +77,7 @@ class TestTransformation(unittest.TestCase):
             (12, {'type': 'F', 'label': 'hb'}),
         ])
         phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
-        pattern = create_pattern(phead, pbase, [
+        pattern = compose_pattern(phead, pbase, [
             (10, 11, {'type': 'replacement', 'label': 'Re'}),
             (10, 12, {'type': 'replacement', 'label': 'Re'})
         ])
@@ -103,7 +103,7 @@ class TestTransformation(unittest.TestCase):
         pbase, phead = nx.DiGraph(), nx.DiGraph()
         pbase.add_nodes_from([(10, {'type': None, 'label': 'a'})])
         phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
-        pattern = create_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'})])
+        pattern = compose_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'})])
 
         # Create expected result
         result_graph = nx.DiGraph()
@@ -138,7 +138,7 @@ class TestTransformation(unittest.TestCase):
             (12, {'type': 'F', 'label': 'hb'}),
         ])
         phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
-        pattern = create_pattern(phead, pbase, [
+        pattern = compose_pattern(phead, pbase, [
             (10, 11, {'type': 1, 'label': '1'}),
             (10, 12, {'type': 1, 'label': '1'})
         ])
