@@ -301,7 +301,7 @@ class GraphCollection:
         _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
         iso = self.renew_iso(iso, reindex_map)
         nx.relabel_nodes(self.G, iso, copy=False) # add base instead of Gisonodes  
-        self.execute_spetial_rules(pattern, reindex_map)
+        self.execute_spetial_rules(P_copy_as_graph, reindex_map)
         
     def transfer_data(self, src_node, dst_node, head=True):
         if head:

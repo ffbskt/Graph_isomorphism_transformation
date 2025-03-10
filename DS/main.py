@@ -58,29 +58,41 @@ def diff_graphs(G1, G2):
 
 def create_test_graph(type='linear'):
     # Create test graph
+    graph = nx.DiGraph()
     if type == 'linear':
-        graph2 = nx.DiGraph()
-        graph2.add_nodes_from([
+        graph.add_nodes_from([
             (0, {'type': 'a', 'label': 'a'}),
             (1, {'type': 'b', 'label': 'b'}),
             (2, {'type': 'c', 'label': 'c'}),
         ])
-        graph2.add_edges_from([
+        graph.add_edges_from([
             (1, 0, {'type': 1, 'label': '1'}),
             (0, 2, {'type': 1, 'label': '1'}),
         ])
     elif type == 'triangle':
-        graph2.add_nodes_from([
+        graph.add_nodes_from([
             (0, {'type': 'a', 'label': 'a'}),
             (1, {'type': 'b', 'label': 'b'}),
             (2, {'type': 'c', 'label': 'c'}),
         ])
-        graph2.add_edges_from([
+        graph.add_edges_from([
             (0, 1, {'type': 1, 'label': '1'}),
             (1, 2, {'type': 1, 'label': '1'}),
             (2, 0, {'type': 1, 'label': '1'}),
         ])
-    return graph2
+    elif type == 'double':
+        graph.add_nodes_from([
+            (0, {'type': 'a', 'label': 'a'}),
+            (1, {'type': 'a', 'label': 'a'}),
+            (2, {'type': 'c', 'label': 'c'}),
+        ])
+        graph.add_edges_from([
+            (0, 1, {'type': 1, 'label': '1'}),
+            (1, 2, {'type': 1, 'label': '1'}),
+            (2, 0, {'type': 1, 'label': '1'}),
+        ])
+
+    return graph
 
 
 def test_single_node_replacement_linear(graph2=create_test_graph(type='linear'), visualize=False):
@@ -240,7 +252,7 @@ def test_multiple_node_addition(graph2=create_test_graph(type='linear'), visuali
 
     # Visualize
     if visualize:
-        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 4: Multiple Node Addition end")
+        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 4: Multiple Node Addition")
     # print('-------------G new ', GC.G.nodes(data=True), GC.G.edges(data=True))
     # print('-------------result_graph ', result_graph.nodes(data=True), result_graph.edges(data=True))
     # print(diff_graphs(GC.G, result_graph))
@@ -305,21 +317,26 @@ if __name__ == "__main__":
     # test_GC()
     
     # Run a final transformation visualization
-    G = create_test_graph(type='linear')
+    G = create_test_graph(type='double')
     phead, pbase = nx.DiGraph(), nx.DiGraph()
     phead.add_nodes_from([
-        (10, {'type': 'T', 'label': 'aa'}),
-        (11, {'type': 'F', 'label': 'bb'}),
+        (10, {'type': None, 'label': 'aa'}),
+        (11, {'type': None, 'label': 'bb'}),
     ])
     phead.add_edges_from([(10, 11, {'type': 1, 'label': '1'})])
-    pbase.add_nodes_from([(12, {'type': 'T', 'label': 'a'})])
+    pbase.add_nodes_from([(12, {'type': None, 'label': 'a'})])
     pattern = create_pattern(phead, pbase, [
         (10, 11, {'type': 1, 'label': '1'}),
-        (12, 10, {'type': 1, 'label': 'e'})
+        (12, 10, {'type': 'replacement', 'label': 'e'})
     ])
     G_copy = G.copy()
+    GC.clear()
+    GC.add_graph_to_collection(G, label='test', is_pattern=False)
+
+    GC.transform(pattern, number_of_transformations=2)
+    print('GC.G', GC.G.nodes(data=True), GC.G.edges(data=True))
     
-    #VisG.visualize_transformation(G_copy, pattern, G, "Test 5: Multiple Node Addition end")
+    VisG.visualize_transformation(G_copy, pattern, GC.G, "Test 5: Multiple Node Addition end")
 
 
 
