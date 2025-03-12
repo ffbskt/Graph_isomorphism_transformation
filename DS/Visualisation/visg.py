@@ -266,14 +266,15 @@ class VisG:
         # Set axes limits with margin
         margin = 0.2
         all_coords = np.array(list(self.pos.values()))
-        x_min, y_min = all_coords.min(axis=0)
-        x_max, y_max = all_coords.max(axis=0)
-        
-        width = x_max - x_min
-        height = y_max - y_min
-        
-        ax.set_xlim(x_min - margin * width, x_max + margin * width)
-        ax.set_ylim(y_min - margin * height, y_max + margin * height)
+        if len(all_coords) > 0:  # Only if we have nodes
+            x_min, y_min = all_coords.min(axis=0)
+            x_max, y_max = all_coords.max(axis=0)
+            
+            width = x_max - x_min
+            height = y_max - y_min
+            
+            ax.set_xlim(x_min - margin * width, x_max + margin * width)
+            ax.set_ylim(y_min - margin * height, y_max + margin * height)
         
         # Draw nodes for each type
         for node_type in set(nx.get_node_attributes(self.graph, 'type').values()):
@@ -296,6 +297,7 @@ class VisG:
         
         # Draw edges for each type
         for edge_type in set(nx.get_edge_attributes(self.graph, 'type').values()):
+            # Get edges of current type
             edge_list = [(u, v) for u, v, attr in self.graph.edges(data=True) 
                         if attr.get('type', 'default') == edge_type]
             
@@ -310,14 +312,26 @@ class VisG:
                 width=config['width'],
                 ax=ax
             )
+            
+            # Draw edge labels for this type immediately
+            this_type_edge_labels = {}
+            for u, v, attr in self.graph.edges(data=True):
+                if attr.get('type', 'default') == edge_type and 'label' in attr and attr['label'] is not None:
+                    this_type_edge_labels[(u, v)] = attr['label']
+            
+            if this_type_edge_labels:
+                nx.draw_networkx_edge_labels(
+                    self.graph, 
+                    self.pos, 
+                    this_type_edge_labels, 
+                    font_size=6,
+                    bbox=dict(facecolor='white', edgecolor='none', alpha=0.7),
+                    ax=ax
+                )
         
         # Add node labels (small size)
         labels = nx.get_node_attributes(self.graph, 'label')
         nx.draw_networkx_labels(self.graph, self.pos, labels, font_size=8, ax=ax)
-        
-        # Add edge labels (small size)
-        edge_labels = nx.get_edge_attributes(self.graph, 'label')
-        nx.draw_networkx_edge_labels(self.graph, self.pos, edge_labels, font_size=6)
         
         # Add legend for node types
         legend_elements = [
@@ -332,6 +346,10 @@ class VisG:
         
         ax.set_title(title)
         ax.axis('off')
+        
+        # Force draw to ensure this subplot is complete before moving to the next
+        fig = ax.figure
+        fig.canvas.draw_idle()
         
         return ax
         
@@ -358,24 +376,37 @@ class VisG:
         """
         # Create figure for this test
         fig, (ax1, ax2, ax3) = plt.subplots(1, 3, figsize=(18, 5))
+        fig.suptitle(test_name)
+        
+        # Explicitly clear the axes
+        ax1.clear()
+        ax2.clear()
+        ax3.clear()
 
+        # Create completely separate VisG instances for each graph
         # Initial graph
         vis1 = cls()
-        vis1.add_graph(graph)
-        vis1.draw(layout='spring', title='Initial Graph', ax=ax1)
+        vis1.add_graph(graph.copy())  # Use copy to ensure complete isolation
+        vis1.get_layout(layout='spring')  # Pre-compute layout
+        vis1.draw(title='Initial Graph', ax=ax1)
+        plt.draw()  # Force draw
 
         # Pattern graph
         vis2 = cls()
-        vis2.add_graph(pattern)
-        vis2.draw(layout='spring', title='Pattern', ax=ax2)
+        vis2.add_graph(pattern.copy())  # Use copy to ensure complete isolation
+        vis2.get_layout(layout='spring')  # Pre-compute layout
+        vis2.draw(title='Pattern', ax=ax2)
+        plt.draw()  # Force draw
 
         # Result graph
         vis3 = cls()
-        vis3.add_graph(result)
-        vis3.draw(layout='spring', title='Result Graph', ax=ax3)
+        vis3.add_graph(result.copy())  # Use copy to ensure complete isolation
+        vis3.get_layout(layout='spring')  # Pre-compute layout
+        vis3.draw(title='Result Graph', ax=ax3)
+        plt.draw()  # Force draw
 
-        plt.suptitle(test_name)
-        plt.tight_layout()
+        plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave room for the suptitle
+        fig.canvas.draw()  # Final draw to ensure everything is visible
 
         # Save the visualization to file
         output_dir = "test_data"
@@ -383,7 +414,8 @@ class VisG:
             os.makedirs(output_dir)
         
         # Create a filename for the combined image
-        combined_path = os.path.join(output_dir, "combined_transformations.png")
+        combined_path = os.path.join(output_dir, f"{test_name.replace(' ', '_')}.png")
+        plt.savefig(combined_path, bbox_inches='tight', dpi=300)
         
         # Store figures as a class variable
         if not hasattr(cls, 'figures'):
@@ -421,12 +453,12 @@ class VisG:
             
             # Save the combined figure
             combined_fig.tight_layout()
-            combined_fig.savefig(combined_path, bbox_inches='tight', dpi=300)
+            combined_fig.savefig(os.path.join(output_dir, "combined_transformations.png"), bbox_inches='tight', dpi=300)
             plt.close(combined_fig)
             
             # Clear the stored figures
             cls.figures = []
             
-            print(f"Saved combined visualization to {combined_path}")
+            print(f"Saved combined visualization to {os.path.join(output_dir, 'combined_transformations.png')}")
         else:
-            print(f"Added {test_name} to combined visualization") 
+            print(f"Saved visualization for {test_name} to {combined_path}") 

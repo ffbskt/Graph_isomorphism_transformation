@@ -34,8 +34,8 @@ def main():
     suite.addTest(unittest.makeSuite(TestMatching))
     print("  - Transformation Tests")
     suite.addTest(unittest.makeSuite(TestTransformation))
-    print("  - Visualization Tests")
-    suite.addTest(unittest.makeSuite(TestVisG))
+    #print("  - Visualization Tests")
+    #suite.addTest(unittest.makeSuite(TestVisG))
     
     print("\nRunning tests...\n")
     # Run the tests

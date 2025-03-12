@@ -103,7 +103,14 @@ class GraphTransformationInterface:
     def __init__(self, num_patterns=5, num_transformations=10):
         self.source_graph = create_random_graph()
         self.target_graph = create_random_graph()
-        self.patterns = [create_random_pattern() for _ in range(num_patterns)]
+        self.patterns = []
+        for _ in range(num_patterns):
+            p = create_random_pattern(num_phead_nodes=2, num_edges_head=2,
+                                      num_pbase_nodes=1, num_edges_base=0,
+                                      num_connect_edges=1, 
+                                      node_types=None, edge_types=None, node_labels=['U',], edge_labels=None)
+            self.patterns.append(p)
+            # print('pattern', p.nodes(data=True), p.edges())
         self.num_transformations = num_transformations
         self.transformation_results = []
         self.GC = GraphCollection()
@@ -163,17 +170,179 @@ class GraphTransformationInterface:
         # tools.display_dataframe_to_user("Transformation Results", df)
         print(self.transformation_results)
 
-# Example Usage
-interface = GraphTransformationInterface()
-interface.run_experiment()
-interface.display_results()
+
 
 
 #-----------------------------------------------------------------------
+def test_single_node_replacement_linear(graph2=create_test_graph(type='linear'), visualize=False):
+    """Test replacing a single node with another node.
+    if pattern type of edge is replacement,
+    then we should not remove gnode and replace all edges in and out of gnode to hnode"""
+    # Create pattern
+    pbase, phead = nx.DiGraph(), nx.DiGraph()
+    pbase.add_nodes_from([(10, {'type': 'a', 'label': 'a'})])
+    phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
+    pattern = compose_pattern(phead, pbase, [(10, 11, {'type': 'replacement', 'label': 'Re'})])
+
+    # Apply transformation
+    graph2_copy = graph2.copy()
+    GC.clear()
+    GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+    GC.transform(pattern)
+
+    # Create expected result (matching the node IDs that are actually produced)
+    result_graph = nx.DiGraph()
+    result_graph.add_nodes_from([
+        (3, {'type': 'F', 'label': 'hb'}),  # The transformation will create this as node 3
+        (1, {'type': 'b', 'label': 'b'}),
+        (2, {'type': 'c', 'label': 'c'}),
+    ])
+    result_graph.add_edges_from([
+        (1, 3, {'type': 1, 'label': '1'}),
+        (3, 2, {'type': 1, 'label': '1'}),
+    ])
+
+    # Visualize
+    if visualize:
+        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 1: Single Node Replacement")
+
+    # Compare graphs
+    equal_nodes = set(GC.G.nodes()) == set(result_graph.nodes())
+    equal_edges = set(GC.G.edges()) == set(result_graph.edges())
+    
+    # For debugging - check edges more carefully
+    edge_data_match = True
+    for u, v in result_graph.edges():
+        if not GC.G.has_edge(u, v):
+            print(f"Missing edge ({u}, {v}) in result")
+            edge_data_match = False
+        elif GC.G.get_edge_data(u, v) != result_graph.get_edge_data(u, v):
+            print(f"Edge data mismatch for ({u}, {v}): Expected {result_graph.get_edge_data(u, v)}, Got {GC.G.get_edge_data(u, v)}")
+            edge_data_match = False
+    
+    if not equal_nodes:
+        print(f"Node mismatch. Expected: {result_graph.nodes(data=True)}, Got: {GC.G.nodes(data=True)}")
+    if not equal_edges:
+        print(f"Edge mismatch. Expected: {list(result_graph.edges(data=True))}, Got: {list(GC.G.edges(data=True))}")
+        
+    return equal_nodes and equal_edges and edge_data_match
 
 
+def test_multiple_node_replacement(graph2=create_test_graph(type='linear'), visualize=False):
+    """Test replacing a node with multiple connected nodes."""
+    # Create pattern
+    pbase, phead = nx.DiGraph(), nx.DiGraph()
+    pbase.add_nodes_from([(10, {'type': None, 'label': 'a'})])
+    phead.add_nodes_from([
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
+    ])
+    phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
+    pattern = compose_pattern(phead, pbase, [
+        (10, 11, {'type': 'replacement', 'label': 'Re'}),
+        (10, 12, {'type': 'replacement', 'label': 'Re'})
+    ])
+
+    # Create expected result
+    result_graph = nx.DiGraph()
+    result_graph.add_nodes_from([(1, {'type': 'b', 'label': 'b'}), (2, {'type': 'c', 'label': 'c'}), (3, {'type': 'F', 'label': 'hb'}), (4, {'type': 'F', 'label': 'hb'})])
+    result_graph.add_edges_from([(1, 3, {'type': 1, 'label': '1'}), (1, 4, {'type': 1, 'label': '1'}), (3, 4, {'type': 1, 'label': '1'}), (3, 2, {'type': 1, 'label': '1'}), (4, 2, {'type': 1, 'label': '1'})])
+
+    # Apply transformation
+    graph2_copy = graph2.copy()
+    GC.clear()
+    GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+    GC.transform(pattern)
+
+    # Visualize
+    if visualize:
+        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 2: Multiple Node Replacement")
+
+    equals = diff_graphs(GC.G, result_graph) == {}
+    return equals  #nx.utils.graphs_equal(result_graph, GC.G)
+
+
+def test_node_addition(graph2=create_test_graph(type='linear'), visualize=False):
+    """Test adding a new node to existing node."""
+    # Create pattern
+    pbase, phead = nx.DiGraph(), nx.DiGraph()
+    pbase.add_nodes_from([(10, {'type': 'a', 'label': 'a'})])
+    phead.add_nodes_from([(11, {'type': 'F', 'label': 'hb'})])
+    pattern = compose_pattern(phead, pbase, [(10, 11, {'type': 1, 'label': '1'})])
+
+    # Create expected result
+    result_graph = nx.DiGraph()
+    result_graph.add_nodes_from([(1, {'type': 'b', 'label': 'b'}), 
+                                 (2, {'type': 'c', 'label': 'c'}), 
+                                 (3, {'type': 'F', 'label': 'hb'}), 
+                                 (4, {'type': 'a', 'label': 'a'})]
+                                )
+    result_graph.add_edges_from([
+         (1, 4, {'type': 1, 'label': '1'}), 
+         (4, 3, {'type': 1, 'label': '1'}), 
+         (4, 2, {'type': 1, 'label': '1'})
+    ])
+
+    # Apply transformation
+    graph2_copy = graph2.copy()
+    GC.clear()
+    GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+    GC.transform(pattern)
+    #print('-------in------G new ', GC.G.nodes(data=True), GC.G.edges)
+    #print(result_graph.nodes(data=True), result_graph.edges)
+    # print('-----------3--G new ', GC.G.nodes(data=True), GC.G.edges(data=True))
+    # print('-----------3--result_graph ', result_graph.nodes(data=True), result_graph.edges(data=True))
+    # print(diff_graphs(GC.G, result_graph))
+    
+    # Visualize
+    if visualize:
+        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 3: Node Addition")
+
+    equals = diff_graphs(GC.G, result_graph) == {} #nx.utils.graphs_equal(result_graph, GC.G)
+    # print(f"Node Addition: {'PASSED' if equals else 'FAILED'}")
+    return equals
+
+
+def test_multiple_node_addition(graph2=create_test_graph(type='linear'), visualize=False):
+    """Test adding multiple connected nodes to existing node."""
+    # Create pattern
+    pbase, phead = nx.DiGraph(), nx.DiGraph()
+    pbase.add_nodes_from([(10, {'type': None, 'label': 'a'})])
+    phead.add_nodes_from([
+        (11, {'type': 'F', 'label': 'hb'}),
+        (12, {'type': 'F', 'label': 'hb'}),
+    ])
+    phead.add_edges_from([(11, 12, {'type': 1, 'label': '1'})])
+    pattern = compose_pattern(phead, pbase, [
+        (10, 11, {'type': 1, 'label': '1'}),
+        (10, 12, {'type': 1, 'label': '1'})
+    ])
+
+    # Create expected result
+    result_graph = nx.DiGraph()
+    result_graph.add_nodes_from([(1, {'type': 'b', 'label': 'b'}), (2, {'type': 'c', 'label': 'c'}), (3, {'type': 'F', 'label': 'hb'}), (4, {'type': 'F', 'label': 'hb'}), (5, {'type': 'a', 'label': 'a'})])
+    result_graph.add_edges_from([(1, 5, {'type': 1, 'label': '1'}), (3, 4, {'type': 1, 'label': '1'}), (5, 3, {'type': 1, 'label': '1'}), (5, 4, {'type': 1, 'label': '1'}), (5, 2, {'type': 1, 'label': '1'})])
+
+    # Apply transformation
+    graph2_copy = graph2.copy()
+    GC.clear()
+    GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+    GC.transform(pattern)
+
+    # Visualize
+    if visualize:
+        VisG.visualize_transformation(graph2_copy, pattern, GC.G, "Test 4: Multiple Node Addition end")
+    # print('-------------G new ', GC.G.nodes(data=True), GC.G.edges(data=True))
+    # print('-------------result_graph ', result_graph.nodes(data=True), result_graph.edges(data=True))
+    # print(diff_graphs(GC.G, result_graph))
+    # 
+    equals = diff_graphs(GC.G, result_graph) == {} #nx.utils.graphs_equal(result_graph, GC.G)
+    return equals
+
+#-----------------------------------------------------------------------
 
 def test_GC():
+    GC.clear()
     print('\n--- Testing GraphCollection ---')
     G = create_test_graph(type='linear')
     pbase, phead = nx.DiGraph(), nx.DiGraph()
@@ -198,7 +367,19 @@ def test_GC():
 
 
 if __name__ == "__main__":
-    
+    # Run regular tests
+    tests = [
+        ("Single Node Replacement", test_single_node_replacement_linear),
+        ("Multiple Node Replacement", test_multiple_node_replacement),
+        ("Node Addition", test_node_addition),
+        ("Multiple Node Addition", test_multiple_node_addition)
+    ]
+
+    # for test_name, test_func in tests:
+    #     test_graph = create_test_graph(type='linear')
+    #     result = test_func(test_graph, visualize=True)
+    #     print(f"{test_name}: {'PASSED' if result else 'FAILED'}")
+
     # Run the GraphCollection test
     test_GC()
     
@@ -222,7 +403,13 @@ if __name__ == "__main__":
     GC.transform(pattern, number_of_transformations=2)
     #print('GC.G', GC.G.nodes(data=True), GC.G.edges(data=True))
     
-    #VisG.visualize_transformation(G_copy, pattern, GC.G, "Test 5: Multiple Node Addition end")
+    VisG.visualize_transformation(G_copy, pattern, GC.G, "Test 5: Multiple Node Addition")
+
+
+    # Example Usage
+    interface = GraphTransformationInterface()
+    interface.run_experiment()
+    interface.display_results()
 
 
 

@@ -76,27 +76,44 @@ def create_random_edge_list(base_nodes, head_nodes):
     number_of_edges = np.random.randint(1, len(head_nodes))
     edges = []
     for i in range(number_of_edges):
-        src = np.random.choice(base_nodes)
-        dst = np.random.choice(head_nodes)
-        edges.append((src, dst, {'type': label_type}))
+        src = int(np.random.choice(list(base_nodes)))
+        dst = int(np.random.choice(list(head_nodes)))
+        edges.append((src, dst, {'type': label_type, 'label': label_type[:2]}))
     return edges
 
-def create_random_pattern(num_phead_nodes=2, num_pbase_nodes=1, num_edges_head=2, num_edges_base=0, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
+def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1, num_edges_base=0, num_connect_edges=1, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
+    """
+    Create random pattern with random nodes and edges
+    Args:
+        num_phead_nodes (int): Number of nodes in the head
+        num_pbase_nodes (int): Number of nodes in the base
+        num_edges_head (int): Number of edges in the head
+        num_edges_base (int): Number of edges in the base
+        num_connect_edges (int): Number of connect edges
+        node_types (list): List of node types
+        edge_types (list): List of edge types
+    !!    node_labels (list): List of node labels of head pattern and for base is None!!
+        edge_labels (list): List of edge labels
+    Returns:
+        nx.DiGraph: Random pattern
+    """
     phead = create_random_graph(num_phead_nodes, num_edges_head, node_types, edge_types, node_labels, edge_labels)
-    pbase = create_random_graph(num_pbase_nodes, num_edges_base, node_types, edge_types, node_labels, edge_labels)
+    pbase = create_random_graph(num_pbase_nodes, num_edges_base, node_types, edge_types, None, edge_labels)
     
     # Ensure phead node indices are greater than pbase
     max_pbase_index = max(pbase.nodes) if pbase.nodes else -1
     phead = nx.relabel_nodes(phead, lambda x: x + max_pbase_index + 1)
     
     # Create random links between phead and pbase
-    for _ in range(num_edges):
-        u = random.choice(list(pbase.nodes))
-        v = random.choice(list(phead.nodes))
-        edge_type = random.choice(['replacement', '1'])
-        edge_label = random.choice(['1'])
-        phead.add_edge(u, v, type=edge_type, label=edge_label)
+    # for _ in range(num_connect_edges):
+    #     u = np.random.choice(list(pbase.nodes))
+    #     v = np.random.choice(list(phead.nodes))
+    #     edge_type = np.random.choice(['replacement', '1'])
+    #     edge_label = np.random.choice(['1'])
+    #     phead.add_edge(u, v, type=edge_type, label=edge_label)
+
 
     edges = create_random_edge_list(pbase.nodes(), phead.nodes())
+    print('edges', edges)
     return compose_pattern(phead, pbase, edges)
 

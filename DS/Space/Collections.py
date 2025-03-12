@@ -2,6 +2,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 from collections import deque, defaultdict
 from DS.Space.Matching import edge_none_match, node_none_match
+from DS.Logger.logger import JSONLogger
 import copy
 import random
 random.seed(1)
@@ -146,6 +147,7 @@ class GraphCollection:
         self.G = nx.DiGraph()
         self.label2graphs = {}
         self.label2hierarchy = defaultdict(list) # one label could be word or set of words  # Maps hierarchy level to node ID
+        self.logger = JSONLogger()
 
     def clear(self):
         self.NC = NodeCollection()
@@ -233,6 +235,7 @@ class GraphCollection:
         #self.add_label(G_reindexed, label)
         if is_pattern:
             G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
+        self.logger.info("Graph added to collection", graph=G_reindexed.nodes(data=True), reindex_map=reindex_map)
         return G_reindexed, reindex_map
     
     def subgraph_with_neighbors(self, node_list, G=None, depth=1, only_out_edges=False, remove_nodes=[]):
@@ -289,19 +292,13 @@ class GraphCollection:
             new_iso[old] = reindex_map[new]
         return new_iso
 
-
-    
-    def apply_pattern(self, pattern, iso):
-        """
-        Apply the transformation pattern to graph G
-        """
+    def add_copy_of_pattern_to_G(self, pattern):
         P_copy_as_graph = pattern.copy()
         # remove B, H nodes from pattern
         P_copy_as_graph.remove_nodes_from(['B', 'H'])
         _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
-        iso = self.renew_iso(iso, reindex_map)
-        nx.relabel_nodes(self.G, iso, copy=False) # add base instead of Gisonodes  
-        self.execute_spetial_rules(P_copy_as_graph, reindex_map)
+        return P_copy_as_graph, reindex_map
+        
         
     def transfer_data(self, src_node, dst_node, head=True):
         if head:
@@ -384,26 +381,27 @@ class GraphCollection:
         """
         pbase = pattern.graph['pbase']
         isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
-        for iso in list(isomorphisms)[:number_of_transformations]:
-            #print('Isomorphisms', G.nodes(data=True), pbase.nodes(data=True), list(isomorphisms))
-            #print('_____________Iso', iso)
-            self.apply_pattern(pattern, iso)
+        isomorphisms = list(isomorphisms)[:number_of_transformations]
+        self.logger.info("Isomorphisms found", isomorphisms=isomorphisms, pattern=pattern.nodes(data=True))
+        for iso in isomorphisms:
+            pattern_copy, reindex_map = self.add_copy_of_pattern_to_G(pattern)
+            iso = self.renew_iso(iso, reindex_map)
+            nx.relabel_nodes(self.G, iso, copy=False)
+            log = self.get_transformation_log(pattern, iso)
+            self.logger.info("Graph after add pattern", graph_pattern=log) # add base instead of G onodes 
+            self.execute_spetial_rules(pattern_copy, reindex_map)
+            self.logger.info("Graph after execute special rules", graph_pattern=log) # add base instead of G onodes 
 
-    
-   # This wrong method, isomorphism instead is correct. (iso base: node-^X type...)
-    # def get_concrete_edge(self, node, G=None, elabel=None, etype=None, for_children=True):
-    #     if G is None:
-    #         G = self.G
-    #     if for_children:
-    #         childrens = list(G.successors(node))
-    #     else:
-    #         childrens = list(G.predecessors(node))
-    #     for child in childrens:
-    #         if for_children:
-    #             edge = (node, child)
-    #         else:
-    #             edge = (child, node)
-    #         if self.edge_param_match(edge, G, elabel, etype):
-    #             return edge
-    #     return None
-    
+    def get_transformation_log(self, pattern, iso):
+        active_nodes = []
+        for k, v in iso.items():
+            active_nodes.extend([k, v])
+        g = self.subgraph_with_neighbors(node_list=active_nodes)
+        return {"Gnodes": g.nodes(data=True), "Gedges": g.edges(data=True), 
+                "Pbase": pattern.graph['pbase'].nodes(), "Phead": pattern.graph['phead'].nodes()}
+            
+
+
+
+if __name__ == "__main__":
+    pass
