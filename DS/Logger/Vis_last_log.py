@@ -2,100 +2,124 @@ import json
 import networkx as nx
 import matplotlib.pyplot as plt
 from DS.Visualisation.visg import VisG
+from typing import List, Dict, Optional, Tuple
+import os
 
 
-def visualize_last_graph_from_log(log_file):
-    """
-    Reads a log file and visualizes the last recorded graph transformation.
+class LogVisualizer:
+    def __init__(self, log_file: str):
+        """Initialize LogVisualizer with a log file path.
+
+        Parameters:
+        -----------
+        log_file : str
+            Path to the log file containing JSON logs.
+        """
+        self.log_file = log_file
+        self.last_graph_pattern = None
+        self.last_replacement = None
+        self.all_replacements = []
+
+    def get_last_n_logs(self, graphs_type: list=None, ids: list=None, last_n: int=5) -> List[Tuple[int, str, Dict]]:
+        """Get the graph transformations from the log.
+
+        Parameters:
+        -----------
+        graphs_type : list, optional
+            List of graph types to retrieve. If None, gets the last 5 entries.  
+        ids : list, optional
+            List of specific log entry IDs to retrieve. If None, gets the last 5 entries.
+        last_n : int, optional
+            Number of last entries to retrieve. Default is 5.
+
+        Returns:
+        --------
+        List[Tuple[int, str, Dict]]
+            List of tuples containing (id, message, graph_pattern) for each log entry
+        """
+        if graphs_type is None:
+            graphs_type = ["Graph after add pattern", "Graph after execute special rules", "Graph added to collection"]        
+        self.last_graph_patterns = []
+        
+        with open(self.log_file, 'r') as f:
+            lines = f.readlines()
+            
+            # If no specific ids provided, get the last 5 entries
+            if ids is None:
+                ids = range(len(lines)-5, len(lines))    
+                # Get entries with specific IDs
+            for line in reversed(lines):
+                log_entry = json.loads(line)
+                if 'id' in log_entry and log_entry["message"] in graphs_type and log_entry["id"] in ids:
+                    self.last_graph_patterns.append((log_entry["id"], log_entry["message"], log_entry["graph_pattern"]))
+                if len(self.last_graph_patterns) == last_n:
+                    break
+        return reversed(self.last_graph_patterns)
+
+    def create_graphs_from_log(self, last_graph_patterns: List[Tuple[int, str, Dict]]) -> List[Tuple[str, nx.DiGraph]]:
+        """Create NetworkX graphs from log entries.
+
+        Parameters:
+        -----------
+        last_graph_patterns : List[Tuple[int, str, Dict]]
+            List of tuples containing (id, message, graph_pattern)
+
+        Returns:
+        --------
+        List[Tuple[str, nx.DiGraph]]
+            List of tuples containing graph name and NetworkX graph object
+        """
+        graphs_from_log = []
+        for log_entry in last_graph_patterns:
+            # Unpack the tuple (id, message, graph_pattern)
+            id_, message, graph_pattern = log_entry
+            graph = self._create_graph_from_log(graph_pattern)
+            name = f"{id_}_{message}"
+            graphs_from_log.append((name, graph))
+        return graphs_from_log
+
+
+    @staticmethod
+    def _create_graph_from_log(graph_data: Dict) -> nx.DiGraph:
+        """Creates a NetworkX graph from log JSON structure.
+
+        Parameters:
+        -----------
+        graph_data : dict
+            Contains 'Gnodes' and 'Gedges' from the log.
+
+        Returns:
+        --------
+        nx.DiGraph
+            Graph constructed from log data.
+        """
+        G = nx.DiGraph()
+
+        # Convert string representation to tuples
+        nodes = eval(graph_data["Gnodes"])  # Convert string representation into Python objects
+        edges = eval(graph_data["Gedges"])
+
+        # Add nodes
+        for node, attr in nodes:
+            G.add_node(node, **attr)
+
+        # Add edges
+        for src, dst, attr in edges:
+            G.add_edge(src, dst, **attr)
+
+        return G
+
     
-    Parameters:
-    -----------
-    log_file : str
-        Path to the log file containing JSON logs.
-    """
-    last_graph_pattern = None
-    last_replacement = None
-    all_replacements = []  # Store all replacements within the last second
-
-    # Read the log file and extract relevant logs
-    with open(log_file, 'r') as f:
-        for line in f:
-            log_entry = json.loads(line)
-            if log_entry["message"] == "Graph after add pattern":
-                last_graph_pattern = log_entry["graph_pattern"]
-            elif log_entry["message"] == "Graph after execute special rules":
-                last_replacement = log_entry["graph_pattern"]
-                all_replacements.append(last_replacement)
-
-    if not last_graph_pattern or not last_replacement:
-        print("❌ No valid graph transformation logs found.")
-        return
-
-    # Convert log data into NetworkX graphs
-    G_before = create_graph_from_log(last_graph_pattern)
-    G_after = create_graph_from_log(last_replacement)
-
-    # Visualize the last transformation
-    VisG.visualize_transformation(G_before, G_after, result=G_after, test_name="Last Graph Transformation")
-
-    # Combine all replacements and visualize
-    if len(all_replacements) > 1:
-        combined_graph = compose_replacement_graphs(all_replacements)
-        VisG.visualize_transformation(G_before, combined_graph, result=combined_graph, test_name="Composed Replacements")
-
-def create_graph_from_log(graph_data):
-    """
-    Creates a NetworkX graph from log JSON structure.
-    
-    Parameters:
-    -----------
-    graph_data : dict
-        Contains 'Gnodes' and 'Gedges' from the log.
-    
-    Returns:
-    --------
-    nx.DiGraph
-        Graph constructed from log data.
-    """
-    G = nx.DiGraph()
-    
-    # Convert string representation to tuples
-    nodes = eval(graph_data["Gnodes"])  # Convert string representation into Python objects
-    edges = eval(graph_data["Gedges"])
-
-    # Add nodes
-    for node, attr in nodes:
-        G.add_node(node, **attr)
-
-    # Add edges
-    for src, dst, attr in edges:
-        G.add_edge(src, dst, **attr)
-
-    return G
-
-def compose_replacement_graphs(replacement_logs):
-    """
-    Composes multiple replacement graphs into one final graph.
-    
-    Parameters:
-    -----------
-    replacement_logs : list of dict
-        List of transformation logs.
-    
-    Returns:
-    --------
-    nx.DiGraph
-        Combined graph after applying multiple transformations.
-    """
-    combined_graph = nx.DiGraph()
-
-    for log in replacement_logs:
-        G = create_graph_from_log(log)
-        combined_graph = nx.compose(combined_graph, G)
-
-    return combined_graph
 
 
 if __name__ == "__main__":
     log_file = "Log_graph.json"
-    visualize_last_graph_from_log(log_file)
+    visualizer = LogVisualizer(log_file)
+    # Get last logs
+    last_logs = visualizer.get_last_n_logs(ids=range(0, 26), last_n=10) # [17, 18, 19])
+    # Create graphs from logs
+    graphs = visualizer.create_graphs_from_log(last_logs)
+    #print(graphs)
+    # Visualize the sequence of graphs
+    visual_plot = VisG()
+    visual_plot.visualize_graph_from_logs(graphs)

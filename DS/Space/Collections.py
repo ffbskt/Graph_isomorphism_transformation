@@ -119,7 +119,7 @@ class GraphCollection:
         label2graphs (dict): Maps labels to graph identifiers
         singleton2id (dict): Maps singleton node types to their unique IDs
     """
-    def __init__(self, NC=None):
+    def __init__(self, NC=None, logger=None):
         """
         [
         Notes:
@@ -147,7 +147,9 @@ class GraphCollection:
         self.G = nx.DiGraph()
         self.label2graphs = {}
         self.label2hierarchy = defaultdict(list) # one label could be word or set of words  # Maps hierarchy level to node ID
-        self.logger = JSONLogger()
+        self.logger = logger
+        if logger is None:
+            self.logger = JSONLogger()
 
     def clear(self):
         self.NC = NodeCollection()
@@ -235,7 +237,8 @@ class GraphCollection:
         #self.add_label(G_reindexed, label)
         if is_pattern:
             G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
-        self.logger.info("Graph added to collection", graph=G_reindexed.nodes(data=True), reindex_map=reindex_map)
+        graph_log = self.get_graph_to_collection_log(G_reindexed, reindex_map)
+        self.logger.info("Graph added to collection", graph_pattern=graph_log)
         return G_reindexed, reindex_map
     
     def subgraph_with_neighbors(self, node_list, G=None, depth=1, only_out_edges=False, remove_nodes=[]):
@@ -399,6 +402,10 @@ class GraphCollection:
         g = self.subgraph_with_neighbors(node_list=active_nodes)
         return {"Gnodes": g.nodes(data=True), "Gedges": g.edges(data=True), 
                 "Pbase": pattern.graph['pbase'].nodes(), "Phead": pattern.graph['phead'].nodes()}
+
+    def get_graph_to_collection_log(self, graph, reindex_map):
+        return {"Gnodes": graph.nodes(data=True), "Gedges": graph.edges(data=True), 
+                "reindex_map": reindex_map}
             
 
 

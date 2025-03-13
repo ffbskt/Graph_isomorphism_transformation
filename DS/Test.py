@@ -21,6 +21,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from Test_.test_matching import TestMatching
 from Test_.test_transformation import TestTransformation
 from Test_.test_visualisation import TestVisG
+from Test_.test_log import TestLogging
 
 def main():
     print("\n===== Running DS Dynamic System Test Suite =====\n")
@@ -34,6 +35,8 @@ def main():
     suite.addTest(unittest.makeSuite(TestMatching))
     print("  - Transformation Tests")
     suite.addTest(unittest.makeSuite(TestTransformation))
+    print("  - Logging Tests")
+    suite.addTest(unittest.makeSuite(TestLogging))
     #print("  - Visualization Tests")
     #suite.addTest(unittest.makeSuite(TestVisG))
     
@@ -55,8 +58,8 @@ if __name__ == "__main__":
     print("Initializing DS test suite...")
     success = main()
     if success:
-        print("\n✓ All tests passed successfully!")
+        print("\n All tests passed successfully!")
     else:
-        print("\n✗ Some tests failed!")
+        print("\n Some tests failed!")
     # Exit with appropriate code
     sys.exit(0 if success else 1)

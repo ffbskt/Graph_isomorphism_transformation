@@ -462,3 +462,44 @@ class VisG:
             print(f"Saved combined visualization to {os.path.join(output_dir, 'combined_transformations.png')}")
         else:
             print(f"Saved visualization for {test_name} to {combined_path}") 
+
+
+    def visualize_graph_from_logs(self, graphs_from_log):
+        """Visualize multiple graphs in a vertical layout using VisG.
+
+        Parameters:
+        -----------
+        graphs_from_log : List[Tuple[str, nx.DiGraph]]
+            List of tuples containing graph name and NetworkX graph object
+        """
+        n_graphs = len(graphs_from_log)
+        if n_graphs == 0:
+            print("❌ No graphs to visualize.")
+            return
+
+        # Create figure with subplots arranged vertically
+        fig, axes = plt.subplots(n_graphs, 1, figsize=(10, 5*n_graphs))
+        if n_graphs == 1:
+            axes = [axes]  # Make axes iterable when there's only one subplot
+
+        # Plot each graph in its own subplot using VisG
+        for i, (name, graph) in enumerate(graphs_from_log):
+            vis = VisG()
+            vis.add_graph(graph.copy())  # Use copy to ensure complete isolation
+            vis.get_layout(layout='spring')  # Pre-compute layout
+            vis.draw(title=name, ax=axes[i])
+            plt.draw()  # Force draw
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])  # Leave room for the suptitle
+        fig.canvas.draw()  # Final draw to ensure everything is visible
+
+        # Save the visualization to file
+        output_dir = "test_data"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        
+        # Create a filename for the combined image
+        combined_path = os.path.join(output_dir, "graph_sequence.png")
+        plt.savefig(combined_path, bbox_inches='tight', dpi=300)
+        plt.close()
+    
