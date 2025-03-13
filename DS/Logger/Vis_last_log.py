@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from DS.Visualisation.visg import VisG
 from typing import List, Dict, Optional, Tuple
 import os
+import argparse
 
 
 class LogVisualizer:
@@ -38,7 +39,9 @@ class LogVisualizer:
             List of tuples containing (id, message, graph_pattern) for each log entry
         """
         if graphs_type is None:
-            graphs_type = ["Graph after add pattern", "Graph after execute special rules", "Graph added to collection"]        
+            graphs_type = ["Graph after add pattern", "Graph after execute special rules", 
+                           "Graph added to collection", "Graph added to collection p=False", 
+                           "Graph added to collection p=True"]        
         self.last_graph_patterns = []
         
         with open(self.log_file, 'r') as f:
@@ -113,13 +116,26 @@ class LogVisualizer:
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='Visualize graph logs')
+    parser.add_argument('--last_n', type=int, default=5, help='Number of last entries to retrieve')
+    parser.add_argument('--id_start', type=int, help='Start of ID range')
+    parser.add_argument('--id_end', type=int, help='End of ID range (inclusive)')
+    args = parser.parse_args()
+
     log_file = "Log_graph.json"
     visualizer = LogVisualizer(log_file)
+    
+    # Set up ids range if provided
+    ids = None
+    if args.id_start is not None and args.id_end is not None:
+        ids = range(args.id_start, args.id_end + 1)
+    
     # Get last logs
-    last_logs = visualizer.get_last_n_logs(ids=range(0, 26), last_n=10) # [17, 18, 19])
+    last_logs = visualizer.get_last_n_logs(ids=ids, last_n=args.last_n)
+    
     # Create graphs from logs
     graphs = visualizer.create_graphs_from_log(last_logs)
-    #print(graphs)
+    
     # Visualize the sequence of graphs
     visual_plot = VisG()
     visual_plot.visualize_graph_from_logs(graphs)

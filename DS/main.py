@@ -105,10 +105,10 @@ class GraphTransformationInterface:
         self.target_graph = create_random_graph()
         self.patterns = []
         for _ in range(num_patterns):
-            p = create_random_pattern(num_phead_nodes=2, num_edges_head=2,
+            p = create_random_pattern(num_phead_nodes=2, num_edges_head=1,
                                       num_pbase_nodes=1, num_edges_base=0,
                                       num_connect_edges=1, 
-                                      node_types=None, edge_types=None, node_labels=['U',], edge_labels=None)
+                                      node_types=None, edge_types=None, node_labels=['a','b'], edge_labels=None)
             self.patterns.append(p)
             # print('pattern', p.nodes(data=True), p.edges())
         self.num_transformations = num_transformations
@@ -146,17 +146,18 @@ class GraphTransformationInterface:
     
     def run_experiment(self):
         """Runs transformation experiment and logs results."""
-        transformed_graph = self.source_graph.copy()
+        
         for i, pattern in enumerate(self.patterns):
+            transformed_graph = self.source_graph.copy()
 
             transformed_graph = self.transform_graph(transformed_graph, pattern)
             matched_pairs, total_pairs = self.evaluate_similarity(transformed_graph)
             self.transformation_results.append({
-                "Pattern": pattern,
+                #"Pattern": pattern,
                 "Matched Pairs": matched_pairs,
-                "Total Pairs": total_pairs
+                #"Total Pairs": total_pairs
             })
-            VisG.visualize_transformation(self.source_graph, pattern, transformed_graph, "Transformation " + str(i))
+            #VisG.visualize_transformation(self.source_graph, pattern, transformed_graph, "Transformation " + str(i))
         VisG.visualize_transformation(self.source_graph, transformed_graph, self.target_graph, "Source, result, target end")
     
     def get_results(self):
@@ -381,7 +382,7 @@ if __name__ == "__main__":
     #     print(f"{test_name}: {'PASSED' if result else 'FAILED'}")
 
     # Run the GraphCollection test
-    test_GC()
+    # test_GC()
     
     # Run a final transformation visualization
     G = create_test_graph(type='double')
@@ -397,13 +398,10 @@ if __name__ == "__main__":
         (12, 10, {'type': 'replacement', 'label': 'e'})
     ])
     G_copy = G.copy()
-    GC.clear()
-    GC.add_graph_to_collection(G, label='test', is_pattern=False)
-
-    GC.transform(pattern, number_of_transformations=2)
-    #print('GC.G', GC.G.nodes(data=True), GC.G.edges(data=True))
-    
-    VisG.visualize_transformation(G_copy, pattern, GC.G, "Test 5: Multiple Node Addition")
+    # GC.clear()
+    # GC.add_graph_to_collection(G, label='test', is_pattern=False)
+    # GC.transform(pattern, number_of_transformations=2)
+    #VisG.visualize_transformation(G_copy, pattern, GC.G, "Test 5: Multiple Node Addition")
 
 
     # Example Usage

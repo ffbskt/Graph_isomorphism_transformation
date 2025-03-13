@@ -238,7 +238,7 @@ class GraphCollection:
         if is_pattern:
             G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
         graph_log = self.get_graph_to_collection_log(G_reindexed, reindex_map)
-        self.logger.info("Graph added to collection", graph_pattern=graph_log)
+        self.logger.info("Graph added to collection p={}".format(is_pattern), graph_pattern=graph_log)
         return G_reindexed, reindex_map
     
     def subgraph_with_neighbors(self, node_list, G=None, depth=1, only_out_edges=False, remove_nodes=[]):
@@ -389,17 +389,22 @@ class GraphCollection:
         for iso in isomorphisms:
             pattern_copy, reindex_map = self.add_copy_of_pattern_to_G(pattern)
             iso = self.renew_iso(iso, reindex_map)
+            #print('-------new iso', iso, reindex_map,  pattern_copy.edges(), self.G.edges())
             nx.relabel_nodes(self.G, iso, copy=False)
-            log = self.get_transformation_log(pattern, iso)
+            #print('-------new graph', self.G.edges())
+            log = self.get_transformation_log(pattern, iso, depth=None)
             self.logger.info("Graph after add pattern", graph_pattern=log) # add base instead of G onodes 
             self.execute_spetial_rules(pattern_copy, reindex_map)
             self.logger.info("Graph after execute special rules", graph_pattern=log) # add base instead of G onodes 
 
-    def get_transformation_log(self, pattern, iso):
+    def get_transformation_log(self, pattern, iso, depth=2):
         active_nodes = []
         for k, v in iso.items():
             active_nodes.extend([k, v])
-        g = self.subgraph_with_neighbors(node_list=active_nodes)
+        if depth is None:
+            g = self.G
+        else:
+            g = self.subgraph_with_neighbors(node_list=active_nodes, depth=depth)
         return {"Gnodes": g.nodes(data=True), "Gedges": g.edges(data=True), 
                 "Pbase": pattern.graph['pbase'].nodes(), "Phead": pattern.graph['phead'].nodes()}
 

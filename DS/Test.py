@@ -58,8 +58,8 @@ if __name__ == "__main__":
     print("Initializing DS test suite...")
     success = main()
     if success:
-        print("\n All tests passed successfully!")
+        print("\n✓ All tests passed successfully!")
     else:
-        print("\n Some tests failed!")
+        print("\n✗ Some tests failed!")
     # Exit with appropriate code
     sys.exit(0 if success else 1)

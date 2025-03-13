@@ -2,26 +2,6 @@ from pythonjsonlogger import jsonlogger
 import json
 
 
-# Structured JSON Logging Setup
-# class JSONLogger:
-#     def __init__(self, name="GraphCollection", filename="Log_graph.json"):
-#         self.logger = logging.getLogger(name)
-#         self.logger.setLevel(logging.DEBUG)
-#         handler = logging.FileHandler(filename)
-#         formatter = jsonlogger.JsonFormatter('%(asctime)s %(levelname)s %(message)s')
-#         handler.setFormatter(formatter)
-#         self.logger.addHandler(handler)
-
-#     def info(self, message, **kwargs):
-#         self.logger.info(message, extra=kwargs)
-
-#     def debug(self, message, **kwargs):
-#         self.logger.debug(message, extra=kwargs)
-
-#     def error(self, message, **kwargs):
-#         self.logger.error(message, extra=kwargs)
-
-
 import logging
 from pythonjsonlogger import jsonlogger
 
