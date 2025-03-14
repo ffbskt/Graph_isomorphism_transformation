@@ -3,8 +3,10 @@ import networkx as nx
 import random
 from DS.Space.Collections import GraphCollection, NodeCollection
 from DS.Space.Creations import compose_pattern
+from DS.Space.Creations import create_random_pattern, create_random_graph
 from DS.Visualisation.visg import VisG
 from DS.main import create_test_graph, diff_graphs
+
 
 # Create collections as in main.py
 NC = NodeCollection()
@@ -154,6 +156,34 @@ class TestTransformation(unittest.TestCase):
 
         # Verify result
         self.assertEqual({}, diff_graphs(GC.G, result_graph), "Graphs should be identical")
+
+    def test_random_graph_transformation(self):
+        # create N random graphs and M random patterns
+        # apply each pattern to each graph
+        # check if the result is as expected
+        random_graphs = [create_random_graph() for _ in range(10)]
+        random_patterns = [create_random_pattern(edges_types=['1',]) for _ in range(10)]
+        
+        
+        successful_transforms = 0
+        for graph in random_graphs:
+            for pattern in random_patterns:
+                GC.clear()
+                src = graph.copy()                 
+                GC.add_graph_to_collection(src, label='source', is_pattern=False)
+                isomorphism = GC.transform(pattern, number_of_transformations=1)
+                if len(isomorphism) > 0:
+                    successful_transforms += 1
+                    n_new_nodes = len(GC.G.nodes())
+                    expected_nodes = len(src.nodes()) + len(pattern.graph['phead'].nodes()) 
+                    try:
+                        self.assertEqual(n_new_nodes, expected_nodes, 
+                            f"Number of nodes mismatch: Got {n_new_nodes}, Expected {expected_nodes} (source: {len(src.nodes())}, pattern: {len(pattern.nodes())}, base: {len(pattern.graph['pbase'].nodes())})")
+                    except AssertionError as e:
+                        print(src.nodes(), pattern.nodes(), GC.G.nodes())
+                        print(f"Error in transformation: {e}")
+        
+        print(f"\nTotal successful transformations: {successful_transforms} out of {len(random_graphs) * len(random_patterns)} attempts")
 
 
 if __name__ == "__main__":

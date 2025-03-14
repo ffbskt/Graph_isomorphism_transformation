@@ -292,11 +292,16 @@ class GraphCollection:
     def renew_iso(self, iso, reindex_map):
         new_iso = {}
         for old, new in iso.items():
+            if new not in reindex_map:
+                self.logger.error(f"Key error in reindex_map", key=new, reindex_map=reindex_map, iso=iso)
+                raise KeyError(f"Key {new} not found in reindex_map. Full reindex_map: {reindex_map}, Full iso: {iso}")
             new_iso[old] = reindex_map[new]
         return new_iso
 
     def add_copy_of_pattern_to_G(self, pattern):
         P_copy_as_graph = pattern.copy()
+        P_copy_as_graph.graph['pbase'] = pattern.graph['pbase'].copy()
+        P_copy_as_graph.graph['phead'] = pattern.graph['phead'].copy()
         # remove B, H nodes from pattern
         P_copy_as_graph.remove_nodes_from(['B', 'H'])
         _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
@@ -382,20 +387,24 @@ class GraphCollection:
         Returns:
             nx.DiGraph: Transformed graph
         """
+        P = pattern
+        assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
+    
+
         pbase = pattern.graph['pbase']
         isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
         isomorphisms = list(isomorphisms)[:number_of_transformations]
         self.logger.info("Isomorphisms found", isomorphisms=isomorphisms, pattern=pattern.nodes(data=True))
         for iso in isomorphisms:
             pattern_copy, reindex_map = self.add_copy_of_pattern_to_G(pattern)
+            self.logger.debug(message='new iso in transform', iso=iso, reindex_map=reindex_map, pattern_copy_edges=pattern_copy.edges(), graph_edges=self.G.edges())
             iso = self.renew_iso(iso, reindex_map)
-            #print('-------new iso', iso, reindex_map,  pattern_copy.edges(), self.G.edges())
             nx.relabel_nodes(self.G, iso, copy=False)
-            #print('-------new graph', self.G.edges())
             log = self.get_transformation_log(pattern, iso, depth=None)
             self.logger.info("Graph after add pattern", graph_pattern=log) # add base instead of G onodes 
             self.execute_spetial_rules(pattern_copy, reindex_map)
             self.logger.info("Graph after execute special rules", graph_pattern=log) # add base instead of G onodes 
+        return isomorphisms
 
     def get_transformation_log(self, pattern, iso, depth=2):
         active_nodes = []

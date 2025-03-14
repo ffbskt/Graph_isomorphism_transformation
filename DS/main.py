@@ -414,6 +414,49 @@ if __name__ == "__main__":
 
 
 
+    # def test_random_graph_transformation():
+    #     # create N random graphs and M random patterns
+    #     # apply each pattern to each graph
+    #     # check if the result is as expected
+    #     random_graphs = []
+    #     for _ in range(10):
+    #         random_graphs.append(create_random_graph())
+    #     random_patterns = []
+    #     for _ in range(10):
+    #         random_patterns.append(create_random_pattern(edges_types=['1',]))
+    #     for P in random_patterns:
+    #         print(P.nodes(), P.graph['pbase'].nodes(), len(random_patterns))
+    #         assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
+    
+        
+    #     successful_transforms = 0
+    #     for graph in random_graphs:
+    #         for pattern in random_patterns:
+    #             GC.clear()
+    #             src = graph.copy()
+    #             P = pattern
+    #             print(P.nodes(), P.graph['pbase'].nodes())
+    #             assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
+                
+    #             GC.add_graph_to_collection(src, label='source', is_pattern=False)
+    #             P = pattern
+    #             assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
+    #             isomorphism = GC.transform(pattern, number_of_transformations=1)
+    #             if len(isomorphism) > 0:
+    #                 successful_transforms += 1
+    #                 n_new_nodes = len(GC.G.nodes())
+    #                 expected_nodes = len(src.nodes()) + len(pattern.nodes()) - len(pattern.graph['pbase'].nodes())
+    #                 # try:
+    #                 #     self.assertEqual(n_new_nodes, expected_nodes, 
+    #                 #         f"Number of nodes mismatch: Got {n_new_nodes}, Expected {expected_nodes} (source: {len(src.nodes())}, pattern: {len(pattern.nodes())}, base: {len(pattern.graph['pbase'].nodes())})")
+    #                 # except AssertionError as e:
+    #                 #     print(f"Error in transformation: {e}")
+        
+    #     print(f"\nTotal successful transformations: {successful_transforms} out of {len(random_graphs) * len(random_patterns)} attempts")
+
+    # test_random_graph_transformation()
+
+
 
 
 
