@@ -108,7 +108,10 @@ class GraphTransformationInterface:
             p = create_random_pattern(num_phead_nodes=2, num_edges_head=1,
                                       num_pbase_nodes=1, num_edges_base=0,
                                       num_connect_edges=1, 
-                                      node_types=None, edge_types=None, node_labels=['a','b'], edge_labels=None)
+                                      node_types_base=None, edge_types_base=None, 
+                                      node_types_head=None, edge_types_head=None, 
+                                      node_labels_base=['c','b'], edge_labels_base=None, 
+                                      node_labels_head=['a','b'], edge_labels_head=None)
             self.patterns.append(p)
             # print('pattern', p.nodes(data=True), p.edges())
         self.num_transformations = num_transformations

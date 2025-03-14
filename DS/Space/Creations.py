@@ -71,17 +71,25 @@ def compose_pattern(phead, pbase, edges):
     P.graph['iH'] = 'H'
     return P
 
-def create_random_edge_list(base_nodes, head_nodes):
-    label_type = np.random.choice(np.array(['replacement', '1'], dtype=object))
-    number_of_edges = np.random.randint(1, len(head_nodes))
+def create_random_edge_list(base_nodes, head_nodes, num_connect_edges=None, edges_types=None):
+    if edges_types is None:
+        edges_types = ['replacement', '1']
+    edges_types = np.random.choice(np.array(edges_types, dtype=object))
+    if num_connect_edges is None:
+        num_connect_edges = np.random.randint(1, len(head_nodes))
     edges = []
-    for i in range(number_of_edges):
+    for i in range(num_connect_edges):
         src = int(np.random.choice(list(base_nodes)))
         dst = int(np.random.choice(list(head_nodes)))
-        edges.append((src, dst, {'type': label_type, 'label': label_type[:2]}))
+        edges.append((src, dst, {'type': edges_types, 'label': edges_types[:2]}))
     return edges
 
-def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1, num_edges_base=0, num_connect_edges=1, node_types=None, edge_types=None, node_labels=None, edge_labels=None):
+def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1, num_edges_base=0, 
+                         num_connect_edges=1, edges_types=['replacement', '1'],
+                         node_types_base=None, edge_types_base=None, 
+                         node_types_head=None, edge_types_head=None, 
+                         node_labels_base=None, edge_labels_base=None, 
+                         node_labels_head=None, edge_labels_head=None):
     """
     Create random pattern with random nodes and edges
     Args:
@@ -90,30 +98,24 @@ def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1
         num_edges_head (int): Number of edges in the head
         num_edges_base (int): Number of edges in the base
         num_connect_edges (int): Number of connect edges
-        node_types (list): List of node types
-        edge_types (list): List of edge types
-    !!    node_labels (list): List of node labels of head pattern and for base is None!!
-        edge_labels (list): List of edge labels
+        node_types_base (list): List of node types
+        edge_types_base (list): List of edge types
+        node_types_head (list): List of node types
+        edge_types_head (list): List of edge types
+        node_labels_base (list): List of node labels of base pattern
+        edge_labels_base (list): List of edge labels of base pattern
+        node_labels_head (list): List of node labels of head pattern
+        edge_labels_head (list): List of edge labels of head pattern
     Returns:
         nx.DiGraph: Random pattern
     """
-    phead = create_random_graph(num_phead_nodes, num_edges_head, node_types, edge_types, node_labels, edge_labels)
-    pbase = create_random_graph(num_pbase_nodes, num_edges_base, node_types, edge_types, None, edge_labels)
+    phead = create_random_graph(num_phead_nodes, num_edges_head, node_types_head, edge_types_head, node_labels_head, edge_labels_head)
+    pbase = create_random_graph(num_pbase_nodes, num_edges_base, node_types_base, edge_types_base, node_labels_base, edge_labels_base)
     
     # Ensure phead node indices are greater than pbase
     max_pbase_index = max(pbase.nodes) if pbase.nodes else -1
     phead = nx.relabel_nodes(phead, lambda x: x + max_pbase_index + 1)
     
-    # Create random links between phead and pbase
-    # for _ in range(num_connect_edges):
-    #     u = np.random.choice(list(pbase.nodes))
-    #     v = np.random.choice(list(phead.nodes))
-    #     edge_type = np.random.choice(['replacement', '1'])
-    #     edge_label = np.random.choice(['1'])
-    #     phead.add_edge(u, v, type=edge_type, label=edge_label)
-
-
-    edges = create_random_edge_list(pbase.nodes(), phead.nodes())
-    print('edges', edges)
+    edges = create_random_edge_list(pbase.nodes(), phead.nodes(), num_connect_edges, edges_types)
     return compose_pattern(phead, pbase, edges)
 
