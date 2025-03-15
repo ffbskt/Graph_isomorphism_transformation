@@ -7,7 +7,7 @@ import os
 import argparse
 
 
-class LogVisualizer:
+class LogReader:
     def __init__(self, log_file: str):
         """Initialize LogVisualizer with a log file path.
 
@@ -17,7 +17,7 @@ class LogVisualizer:
             Path to the log file containing JSON logs.
         """
         self.log_file = log_file
-        self.last_graph_pattern = None
+        self.last_graph = None
         self.last_replacement = None
         self.all_replacements = []
 
@@ -42,8 +42,8 @@ class LogVisualizer:
             graphs_type = ["Graph after add pattern", "Graph after execute special rules", 
                            "Graph added to collection", "Graph added to collection p=False", 
                            "Graph added to collection p=True"]        
-        self.last_graph_patterns = []
-        
+        self.last_graphs = []
+        print('---', last_n, ids, graphs_type)
         with open(self.log_file, 'r') as f:
             lines = f.readlines()
             
@@ -54,12 +54,12 @@ class LogVisualizer:
             for line in reversed(lines):
                 log_entry = json.loads(line)
                 if 'id' in log_entry and log_entry["message"] in graphs_type and log_entry["id"] in ids:
-                    self.last_graph_patterns.append((log_entry["id"], log_entry["message"], log_entry["graph_pattern"]))
-                if len(self.last_graph_patterns) == last_n:
+                    self.last_graphs.append((log_entry["id"], log_entry["message"], log_entry["graph"]))
+                if len(self.last_graphs) == last_n:
                     break
-        return reversed(self.last_graph_patterns)
+        return reversed(self.last_graphs)
 
-    def create_graphs_from_log(self, last_graph_patterns: List[Tuple[int, str, Dict]]) -> List[Tuple[str, nx.DiGraph]]:
+    def create_graphs_from_log(self, last_graphs: List[Tuple[int, str, Dict]]) -> List[Tuple[str, nx.DiGraph]]:
         """Create NetworkX graphs from log entries.
 
         Parameters:
@@ -73,10 +73,10 @@ class LogVisualizer:
             List of tuples containing graph name and NetworkX graph object
         """
         graphs_from_log = []
-        for log_entry in last_graph_patterns:
-            # Unpack the tuple (id, message, graph_pattern)
-            id_, message, graph_pattern = log_entry
-            graph = self._create_graph_from_log(graph_pattern)
+        for log_entry in last_graphs:
+            # Unpack the tuple (id, message, graph)
+            id_, message, graph = log_entry
+            graph = self._create_graph_from_log(graph)
             name = f"{id_}_{message}"
             graphs_from_log.append((name, graph))
         return graphs_from_log
@@ -112,18 +112,43 @@ class LogVisualizer:
 
         return G
 
-    
-
-
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Visualize graph logs')
+    parser = argparse.ArgumentParser(description='Visualize graph patterns from log file')
+    parser.add_argument('--log_file', type=str, default="Log_graph.json", help='Path to the log file')
     parser.add_argument('--last_n', type=int, default=5, help='Number of last entries to retrieve')
     parser.add_argument('--id_start', type=int, help='Start of ID range')
     parser.add_argument('--id_end', type=int, help='End of ID range (inclusive)')
+    parser.add_argument('--graphs_type', nargs='+', choices=[
+        'Pattern_graph',
+        'Source_graph',
+        'Target_graph',
+        "Graph_after_add_pattern", "Graph_after_execute_special_rules", 
+        "Graph_added_to_collection", "Graph_added_to_collection_p=False","Graph_added_to_collection_p=True"
+    ], default=['Graph_after_add_pattern', 'Graph_after_execute_special_rules', 'Graph_added_to_collection', 'Graph_added_to_collection_p=False', 'Graph_added_to_collection_p=True'], 
+    help='Types of graphs to retrieve. Can specify multiple types.')
+
     args = parser.parse_args()
 
-    log_file = "Log_graph.json"
-    visualizer = LogVisualizer(log_file)
+    # Convert graph type choices to actual message strings
+    type_mapping = {
+        'Pattern_graph': 'Pattern graph',
+        'Source_graph': 'Source graph',
+        'Target_graph': 'Target graph',
+        'Graph_after_add_pattern': 'Graph after add pattern',
+        'Graph_after_execute_special_rules': 'Graph after execute special rules',
+        'Graph_added_to_collection': 'Graph added to collection',
+        'Graph_added_to_collection_p=False': 'Graph added to collection p=False',
+        'Graph_added_to_collection_p=True': 'Graph added to collection p=True'
+    }
+    graphs_type = [type_mapping[t] for t in args.graphs_type]
+
+    log_file = args.log_file
+    last_n = args.last_n
+    id_start = args.id_start
+    id_end = args.id_end
+
+    # Create visualizer and get graphs
+    visualizer = LogReader(log_file)
     
     # Set up ids range if provided
     ids = None
@@ -131,7 +156,7 @@ if __name__ == "__main__":
         ids = range(args.id_start, args.id_end + 1)
     
     # Get last logs
-    last_logs = visualizer.get_last_n_logs(ids=ids, last_n=args.last_n)
+    last_logs = visualizer.get_last_n_logs(ids=ids, last_n=args.last_n, graphs_type=graphs_type)
     
     # Create graphs from logs
     graphs = visualizer.create_graphs_from_log(last_logs)

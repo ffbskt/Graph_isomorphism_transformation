@@ -221,7 +221,7 @@ class GraphCollection:
         P.graph['iH'] = reindex_map[P.graph['iH']]
         return P
     
-    def add_graph_to_collection(self, G, label=None, is_pattern=False):
+    def add_graph_to_collection(self, G, label=None, reindex_p=False, is_pattern=False):
         """Adds a graph to the graph collection as new subgraph.
         
         Args:
@@ -235,10 +235,9 @@ class GraphCollection:
         G_reindexed = nx.relabel_nodes(G, reindex_map)
         self.G.update(G_reindexed)
         #self.add_label(G_reindexed, label)
-        if is_pattern:
+        if reindex_p:
             G_reindexed = self.reindex_pattern(G_reindexed, reindex_map)
-        graph_log = self.get_graph_to_collection_log(G_reindexed, reindex_map)
-        self.logger.info("Graph added to collection p={}".format(is_pattern), graph_pattern=graph_log)
+        self.get_graph_to_collection_log(G_reindexed, reindex_map, message="Graph added to collection p={}".format(is_pattern))
         return G_reindexed, reindex_map
     
     def subgraph_with_neighbors(self, node_list, G=None, depth=1, only_out_edges=False, remove_nodes=[]):
@@ -304,7 +303,7 @@ class GraphCollection:
         P_copy_as_graph.graph['phead'] = pattern.graph['phead'].copy()
         # remove B, H nodes from pattern
         P_copy_as_graph.remove_nodes_from(['B', 'H'])
-        _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, is_pattern=False)
+        _, reindex_map = self.add_graph_to_collection(P_copy_as_graph, label=None, reindex_p=False, is_pattern=True)
         return P_copy_as_graph, reindex_map
         
         
@@ -394,19 +393,19 @@ class GraphCollection:
         pbase = pattern.graph['pbase']
         isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
         isomorphisms = list(isomorphisms)[:number_of_transformations]
-        self.logger.info("Isomorphisms found", isomorphisms=isomorphisms, pattern=pattern.nodes(data=True))
+        if isomorphisms != []:
+            self.logger.info("Isomorphisms found", isomorphisms=isomorphisms, pattern=pattern.nodes(data=True))
         for iso in isomorphisms:
             pattern_copy, reindex_map = self.add_copy_of_pattern_to_G(pattern)
             self.logger.debug(message='new iso in transform', iso=iso, reindex_map=reindex_map, pattern_copy_edges=pattern_copy.edges(), graph_edges=self.G.edges())
             iso = self.renew_iso(iso, reindex_map)
             nx.relabel_nodes(self.G, iso, copy=False)
-            log = self.get_transformation_log(pattern, iso, depth=None)
-            self.logger.info("Graph after add pattern", graph_pattern=log) # add base instead of G onodes 
+            self.get_transformation_log(pattern, iso, depth=None, message='Graph before execute special rules')
             self.execute_spetial_rules(pattern_copy, reindex_map)
-            self.logger.info("Graph after execute special rules", graph_pattern=log) # add base instead of G onodes 
+            self.get_transformation_log(pattern, iso, depth=None, message='Graph after execute special rules')
         return isomorphisms
 
-    def get_transformation_log(self, pattern, iso, depth=2):
+    def get_transformation_log(self, pattern, iso, depth=2, message=None):
         active_nodes = []
         for k, v in iso.items():
             active_nodes.extend([k, v])
@@ -414,12 +413,14 @@ class GraphCollection:
             g = self.G
         else:
             g = self.subgraph_with_neighbors(node_list=active_nodes, depth=depth)
-        return {"Gnodes": g.nodes(data=True), "Gedges": g.edges(data=True), 
+        graph_log = {"Gnodes": g.nodes(data=True), "Gedges": g.edges(data=True), 
                 "Pbase": pattern.graph['pbase'].nodes(), "Phead": pattern.graph['phead'].nodes()}
+        self.logger.debug(message, graph=graph_log)
 
-    def get_graph_to_collection_log(self, graph, reindex_map):
-        return {"Gnodes": graph.nodes(data=True), "Gedges": graph.edges(data=True), 
+    def get_graph_to_collection_log(self, graph, reindex_map, message=None):
+        graph_log = {"Gnodes": graph.nodes(data=True), "Gedges": graph.edges(data=True), 
                 "reindex_map": reindex_map}
+        self.logger.info(message, graph=graph_log)
             
 
 

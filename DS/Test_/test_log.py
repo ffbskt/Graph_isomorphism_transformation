@@ -3,7 +3,7 @@ import networkx as nx
 import random
 import os
 from DS.Space.Collections import GraphCollection
-from DS.Logger.Vis_last_log import LogVisualizer
+from DS.Logger.Vis_last_log import LogReader
 from DS.Logger.logger import JSONLogger
 
 def create_random_graph(num_nodes=5):
@@ -51,7 +51,7 @@ class TestLogging(unittest.TestCase):
             reindex_maps.append(reindex_map)
         
         # Initialize visualizer and get last 3 logs
-        visualizer = LogVisualizer(self.log_file)
+        visualizer = LogReader(self.log_file)
         last_logs = visualizer.get_last_n_logs()
         
         # Create graphs from logs

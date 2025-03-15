@@ -10,6 +10,7 @@ from DS.Space.Collections import GraphCollection, NodeCollection
 from DS.Space.Creations import compose_pattern
 from DS.Visualisation.visg import VisG
 from DS.Space.Creations import create_random_pattern, create_random_graph
+from logging import getLogger
 
 random.seed(1)
 NC = NodeCollection()
@@ -100,18 +101,20 @@ def create_test_graph(type='linear'):
 #import pandas as pd
 
 class GraphTransformationInterface:
-    def __init__(self, num_patterns=5, num_transformations=10):
-        self.source_graph = create_random_graph()
-        self.target_graph = create_random_graph()
+    def __init__(self, num_patterns=15, num_transformations=10):
+        self.source_graph = create_random_graph(3, 2)
+        self.target_graph = create_random_graph(10, 9)
         self.patterns = []
         for _ in range(num_patterns):
-            p = create_random_pattern(num_phead_nodes=2, num_edges_head=1,
-                                      num_pbase_nodes=1, num_edges_base=0,
+            num_pbase_nodes = 2 # random.randint(1, 3)
+            num_phead_nodes = random.randint(1, 3)
+            p = create_random_pattern(num_phead_nodes=num_phead_nodes, num_edges_head=num_phead_nodes - 1,
+                                      num_pbase_nodes=num_pbase_nodes, num_edges_base=1,
                                       num_connect_edges=1, 
                                       node_types_base=None, edge_types_base=None, 
                                       node_types_head=None, edge_types_head=None, 
-                                      node_labels_base=['c','b'], edge_labels_base=None, 
-                                      node_labels_head=['a','b'], edge_labels_head=None)
+                                      node_labels_base=['a','b','c'], edge_labels_base=None, 
+                                      node_labels_head=['a','b','c'], edge_labels_head=None)
             self.patterns.append(p)
             # print('pattern', p.nodes(data=True), p.edges())
         self.num_transformations = num_transformations
@@ -120,14 +123,15 @@ class GraphTransformationInterface:
     
     
     
-    def transform_graph(self, graph, pattern):
+    def transform_graph(self, graph, pattern, number_of_transformations=1):
         """Applies a transformation using the given pattern graph."""
         self.GC.clear()
         src = graph.copy()
         pat = pattern.copy()
         self.GC.add_graph_to_collection(src, label='source', is_pattern=False)
+        print(pat.nodes(), pat.edges())
         #self.GC.add_graph_to_collection(pat, label='pattern', is_pattern=True)
-        self.GC.transform(pat, number_of_transformations=1)
+        self.GC.transform(pat, number_of_transformations=number_of_transformations)
         return self.GC.G
     
     def evaluate_similarity(self, graph):
@@ -149,11 +153,12 @@ class GraphTransformationInterface:
     
     def run_experiment(self):
         """Runs transformation experiment and logs results."""
-        
+        self.GC.get_graph_to_collection_log(self.source_graph, reindex_map=None, message='Source graph')
+        self.GC.get_graph_to_collection_log(self.target_graph, reindex_map=None, message='Target graph')
         for i, pattern in enumerate(self.patterns):
             transformed_graph = self.source_graph.copy()
-
-            transformed_graph = self.transform_graph(transformed_graph, pattern)
+            self.GC.get_graph_to_collection_log(pattern, reindex_map=None, message='Pattern graph')
+            transformed_graph = self.transform_graph(transformed_graph, pattern, number_of_transformations=self.num_transformations)
             matched_pairs, total_pairs = self.evaluate_similarity(transformed_graph)
             self.transformation_results.append({
                 #"Pattern": pattern,
@@ -408,53 +413,9 @@ if __name__ == "__main__":
 
 
     # Example Usage
-    interface = GraphTransformationInterface()
+    interface = GraphTransformationInterface(num_patterns=60)
     interface.run_experiment()
     interface.display_results()
-
-
-
-    # def test_random_graph_transformation():
-    #     # create N random graphs and M random patterns
-    #     # apply each pattern to each graph
-    #     # check if the result is as expected
-    #     random_graphs = []
-    #     for _ in range(10):
-    #         random_graphs.append(create_random_graph())
-    #     random_patterns = []
-    #     for _ in range(10):
-    #         random_patterns.append(create_random_pattern(edges_types=['1',]))
-    #     for P in random_patterns:
-    #         print(P.nodes(), P.graph['pbase'].nodes(), len(random_patterns))
-    #         assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
-    
-        
-    #     successful_transforms = 0
-    #     for graph in random_graphs:
-    #         for pattern in random_patterns:
-    #             GC.clear()
-    #             src = graph.copy()
-    #             P = pattern
-    #             print(P.nodes(), P.graph['pbase'].nodes())
-    #             assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
-                
-    #             GC.add_graph_to_collection(src, label='source', is_pattern=False)
-    #             P = pattern
-    #             assert set(list(P.graph['pbase'].nodes()) + list(P.graph['phead'].nodes()) + ['B', 'H']) == set(P.nodes()), str(P.graph['pbase'].nodes()) + str(P.graph['phead'].nodes()) + str(P.nodes())
-    #             isomorphism = GC.transform(pattern, number_of_transformations=1)
-    #             if len(isomorphism) > 0:
-    #                 successful_transforms += 1
-    #                 n_new_nodes = len(GC.G.nodes())
-    #                 expected_nodes = len(src.nodes()) + len(pattern.nodes()) - len(pattern.graph['pbase'].nodes())
-    #                 # try:
-    #                 #     self.assertEqual(n_new_nodes, expected_nodes, 
-    #                 #         f"Number of nodes mismatch: Got {n_new_nodes}, Expected {expected_nodes} (source: {len(src.nodes())}, pattern: {len(pattern.nodes())}, base: {len(pattern.graph['pbase'].nodes())})")
-    #                 # except AssertionError as e:
-    #                 #     print(f"Error in transformation: {e}")
-        
-    #     print(f"\nTotal successful transformations: {successful_transforms} out of {len(random_graphs) * len(random_patterns)} attempts")
-
-    # test_random_graph_transformation()
 
 
 

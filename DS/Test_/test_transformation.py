@@ -33,7 +33,7 @@ class TestTransformation(unittest.TestCase):
 
         # Apply transformation
         graph2_copy = graph2.copy()
-        GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+        GC.add_graph_to_collection(graph2, label='test', reindex_p=False)
         GC.transform(pattern)
 
         # Create expected result (matching the node IDs that are actually produced)
@@ -90,7 +90,7 @@ class TestTransformation(unittest.TestCase):
         result_graph.add_edges_from([(1, 3, {'type': 1, 'label': '1'}), (1, 4, {'type': 1, 'label': '1'}), (3, 4, {'type': 1, 'label': '1'}), (3, 2, {'type': 1, 'label': '1'}), (4, 2, {'type': 1, 'label': '1'})])
 
         # Apply transformation
-        GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+        GC.add_graph_to_collection(graph2, label='test', reindex_p=False)
         GC.transform(pattern)
 
         # Verify result
@@ -121,7 +121,7 @@ class TestTransformation(unittest.TestCase):
         ])
 
         # Apply transformation
-        GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+        GC.add_graph_to_collection(graph2, label='test', reindex_p=False)
         GC.transform(pattern)
         
         # Verify result
@@ -151,7 +151,7 @@ class TestTransformation(unittest.TestCase):
         result_graph.add_edges_from([(1, 5, {'type': 1, 'label': '1'}), (3, 4, {'type': 1, 'label': '1'}), (5, 3, {'type': 1, 'label': '1'}), (5, 4, {'type': 1, 'label': '1'}), (5, 2, {'type': 1, 'label': '1'})])
 
         # Apply transformation
-        GC.add_graph_to_collection(graph2, label='test', is_pattern=False)
+        GC.add_graph_to_collection(graph2, label='test', reindex_p=False)
         GC.transform(pattern)
 
         # Verify result
@@ -161,26 +161,23 @@ class TestTransformation(unittest.TestCase):
         # create N random graphs and M random patterns
         # apply each pattern to each graph
         # check if the result is as expected
-        random_graphs = [create_random_graph() for _ in range(10)]
+        random_graphs = [create_random_graph(num_nodes=10) for _ in range(10)]
         random_patterns = [create_random_pattern(edges_types=['1',]) for _ in range(10)]
-        
-        
         successful_transforms = 0
         for graph in random_graphs:
             for pattern in random_patterns:
                 GC.clear()
                 src = graph.copy()                 
-                GC.add_graph_to_collection(src, label='source', is_pattern=False)
-                isomorphism = GC.transform(pattern, number_of_transformations=1)
+                GC.add_graph_to_collection(src, label='source', reindex_p=False)
+                isomorphism = GC.transform(pattern, number_of_transformations=5)
                 if len(isomorphism) > 0:
                     successful_transforms += 1
                     n_new_nodes = len(GC.G.nodes())
-                    expected_nodes = len(src.nodes()) + len(pattern.graph['phead'].nodes()) 
+                    expected_nodes = len(src.nodes()) + len(isomorphism) * len(pattern.graph['phead'].nodes()) 
                     try:
                         self.assertEqual(n_new_nodes, expected_nodes, 
                             f"Number of nodes mismatch: Got {n_new_nodes}, Expected {expected_nodes} (source: {len(src.nodes())}, pattern: {len(pattern.nodes())}, base: {len(pattern.graph['pbase'].nodes())})")
                     except AssertionError as e:
-                        print(src.nodes(), pattern.nodes(), GC.G.nodes())
                         print(f"Error in transformation: {e}")
         
         print(f"\nTotal successful transformations: {successful_transforms} out of {len(random_graphs) * len(random_patterns)} attempts")
