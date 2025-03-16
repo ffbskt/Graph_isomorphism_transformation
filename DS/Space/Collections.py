@@ -391,8 +391,8 @@ class GraphCollection:
     
 
         pbase = pattern.graph['pbase']
-        isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match).subgraph_isomorphisms_iter()
-        isomorphisms = list(isomorphisms)[:number_of_transformations]
+        isomorphisms = nx.algorithms.isomorphism.DiGraphMatcher(self.G, pbase, node_match=node_none_match, edge_match=edge_none_match)##subgraph_isomorphisms_iter()
+        isomorphisms = list(isomorphisms.subgraph_monomorphisms_iter())[:number_of_transformations]
         if isomorphisms != []:
             self.logger.info("Isomorphisms found", isomorphisms=isomorphisms, pattern=pattern.nodes(data=True))
         for iso in isomorphisms:

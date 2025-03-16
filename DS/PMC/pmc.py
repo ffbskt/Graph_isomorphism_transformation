@@ -6,6 +6,7 @@ import itertools
 from typing import Dict, Set, Callable, Any, Optional
 import random
 random.seed(42)
+np.random.seed(42)
 
 class McSplit:
     def __init__(self, G1: nx.DiGraph, G2: nx.DiGraph, 
@@ -135,14 +136,44 @@ def edge_match_by_type(e1: Dict[str, Any], e2: Dict[str, Any]) -> bool:
     return e1.get('type') == e2.get('type')
 
 
-def grow_graph(G: nx.DiGraph, num_connections: int, size_of_add_part: int):
+
+def grow_graph(G: nx.DiGraph, num_connections: int, size_of_add_part: int, base_offset: int = 100):
+    """
+    Grow graph while preserving isomorphism by ensuring consistent node indexing and edge additions.
+
+    :param G: Base directed graph to expand
+    :param num_connections: Number of connections between the old and new parts
+    :param size_of_add_part: Size of the new graph part to be added
+    :param base_offset: Starting node ID for new nodes (should be consistent across calls)
+    :return: A new expanded graph maintaining isomorphism
+    """
+    # Clone the original graph to prevent in-place modifications
+    G_new = G.copy()
+    
+    max_node_id = max(G_new.nodes)
+    
+    # Generate a random subgraph of size `size_of_add_part`
     G_add = nx.gnp_random_graph(size_of_add_part, 0.5, directed=True)
-    G.add_nodes_from(G_add.nodes)
-    G.add_edges_from(G_add.edges)
+    
+    # Consistently relabel nodes in the new graph (use offset to ensure same renaming in both calls)
+    relabel_map = {i: i + base_offset for i in G_add.nodes}
+    G_add = nx.relabel_nodes(G_add, relabel_map)
+    
+    # Add nodes and edges to G_new
+    G_new.add_nodes_from(G_add.nodes(data=True))  # Preserve attributes
+    G_new.add_edges_from(G_add.edges(data=True))  # Preserve edge attributes
+    
+    # Maintain isomorphism by adding the same connections in a structured way
+    rng = np.random.default_rng(42)  # Use a fixed seed for reproducibility
+    old_nodes = list(G_new.nodes)[:max_node_id + 1]  # Select only old nodes
+    
     for _ in range(num_connections):
-        src, dst = np.random.choice(G.nodes, 2, replace=False)
-        G.add_edge(int(src), int(dst))
-    return G
+        src = rng.choice(old_nodes)  # Pick a consistent old node
+        dst = rng.choice(list(G_add.nodes))  # Pick from new nodes
+        G_new.add_edge(int(src), int(dst))
+    
+    return G_new
+
 
 
 def check_solution(G1: nx.DiGraph, G2: nx.DiGraph, common_graph: nx.DiGraph, solution: nx.DiGraph, mapping: Dict[Any, Any]):
@@ -159,35 +190,99 @@ def check_solution(G1: nx.DiGraph, G2: nx.DiGraph, common_graph: nx.DiGraph, sol
     #    return False
     
     # Check if common_graph is isomorphic to G1
-    GM1 = DiGraphMatcher(G1, common_graph)
-    is_iso_G1 = GM1.is_isomorphic()
+    GM1 = DiGraphMatcher(G1, solution)
     is_sub_iso_G1 = GM1.subgraph_is_isomorphic()
 
     # Check if common_graph is isomorphic to G2
-    GM2 = DiGraphMatcher(G2, common_graph)
-    is_iso_G2 = GM2.is_isomorphic()
+    GM2 = DiGraphMatcher(G2, solution)
     is_sub_iso_G2 = GM2.subgraph_is_isomorphic()
+
+    GM22 = DiGraphMatcher(G2, common_graph)
+    is_sub_iso_G22 = GM22.subgraph_is_isomorphic()
+
 
     
     # Return True only if common_graph is isomorphic to both G1 and G2
-    collection = {}
-    for e in common_graph.edges:
-        collection[e] = (G1.has_edge(*e), G2.has_edge(*e))
-    #print(is_iso_G1, is_iso_G2, is_sub_iso_G1, is_sub_iso_G2, collection) #common_graph.edges, G1.edges, G2.edges)
-    return is_iso_G1 and is_iso_G2, len(common_graph), len(solution)
+    #print('solution', solution.edges())
+    #print(common_graph.edges())
+    verify_subgraph_isomorphism_manual(G1, solution, mapping)
+    verify_subgraph_isomorphism_manual(G2, solution, mapping)
+    default_mapping = {i: i for i in common_graph.nodes}
+    verify_subgraph_isomorphism_manual(G1, common_graph, default_mapping)
+
+    return (is_sub_iso_G1 and is_sub_iso_G2 and is_sub_iso_G22, 
+            len(common_graph), len(solution), 
+            len(list(GM2.subgraph_isomorphisms_iter())), len(list(GM1.subgraph_isomorphisms_iter())),
+            mapping
+            )
+
+
+def edge_node_equal(G1, G2):
+    nodes_equal = set(G1.nodes) - set(G2.nodes)
+    edges_equal = set(G1.edges) - set(G2.edges)
+    return nodes_equal, edges_equal
+
+
+def test_grow_graph(comon_G, G1, G2):
+    GM1 = DiGraphMatcher(G1, comon_G)
+    is_sub_iso_G1 = GM1.subgraph_is_isomorphic()
+
+    # Check if common_graph is isomorphic to G2
+    GM2 = DiGraphMatcher(G2, comon_G)
+    is_sub_iso_G2 = GM2.subgraph_is_isomorphic()
+
+    # check if nodes are equal and edges are equal
+    nodes_equal, edges_equal = edge_node_equal(comon_G, G2)
+    nodes_equal1, edges_equal1 = edge_node_equal(comon_G, G1)
+    if is_sub_iso_G1 and is_sub_iso_G2:
+        return True
+    print(is_sub_iso_G1, is_sub_iso_G2, nodes_equal, edges_equal, nodes_equal1, edges_equal1, list(GM2.isomorphisms_iter()), list(GM1.isomorphisms_iter()))
+    return False
+
+     
+def verify_subgraph_isomorphism_manual(G1, G2, mapping):
+    """
+    Verify if the provided mapping is a valid subgraph isomorphism from G2 to G1.
+
+    Parameters:
+    - G1: The target graph (networkx.Graph) (should be larger or equal in structure)
+    - G2: The subgraph to be matched (networkx.Graph) (should be smaller or equal)
+    - mapping: A dictionary {node_in_G2: node_in_G1} representing the node correspondence
+
+    Returns:
+    - bool: True if the mapping is a valid subgraph isomorphism, False otherwise
+    """
     
+    # Step 1: Check if all mapped nodes exist in G1
+    for node_G2, mapped_node_G1 in mapping.items():
+        if mapped_node_G1 not in G1:
+            print(f"Node {mapped_node_G1} in G1 is missing (expected from G2's node {node_G2}).")
+            return False  # A required node does not exist in G1
+
+    # Step 2: Check if all edges in G2 exist in G1 after mapping
+    for u, v in G2.edges():
+        mapped_u, mapped_v = mapping[u], mapping[v]
+        if not G1.has_edge(mapped_u, mapped_v):
+            print(f"Edge ({mapped_u}, {mapped_v}) is missing in G1 (expected from ({u}, {v}) in G2).")
+            return False  # A required edge is missing in G1
+
+    # If all nodes and edges match, the mapping is valid
+    return True
     
 
 def test_mcs(iterations: int = 100):
     # create common random directed graph
     common_G = nx.gnp_random_graph(6, 0.5, directed=True)
-    G1 = common_G.copy()
-    G2 = common_G.copy()
+    
     
     for i in range(iterations):
+        G1 = common_G.copy()
+        G2 = common_G.copy()
         # grow graphs
         G1 = grow_graph(G1, 6, 3)
         G2 = grow_graph(G2, 6, 3)
+
+        test_grow_graph(common_G, G1, G2)
         
         
         # find mcs
@@ -196,17 +291,19 @@ def test_mcs(iterations: int = 100):
                             edge_match=edge_match_by_type)
         best_mapping = mcs_solver.find_mcs()
         # Create the common subgraph from the mapping
-        common_subgraph = nx.DiGraph()
+        common_solution_subgraph = nx.DiGraph()
         for u, v in best_mapping.items():
             # Add nodes with attributes
-            common_subgraph.add_node(u, **G1.nodes[u])
+            common_solution_subgraph.add_node(u, **G1.nodes[u])
             # Add edges that exist in both graphs
             for u2, v2 in best_mapping.items():
                 if G1.has_edge(u, u2) and G2.has_edge(v, v2):
-                    common_subgraph.add_edge(u, u2, **G1[u][u2])
+                    common_solution_subgraph.add_edge(u, u2, **G1[u][u2])
     
-        print(check_solution(G1, G2, common_subgraph, common_G, best_mapping))
-
+        isomorphic, G_common_size, G_solution_size, com_iter, sol_iter, mapping = (check_solution(G1, G2, common_G, solution=common_solution_subgraph, mapping=best_mapping))
+        if isomorphic is False or G_common_size > G_solution_size:
+            return False
+    return True
 
 def vanila_test():
     # Example Usage
@@ -277,4 +374,4 @@ if __name__ == "__main__":
     vanila_test()
     #vanila_test_grow_graph()
     # test mcs
-    test_mcs(10)
+    print(test_mcs(10))

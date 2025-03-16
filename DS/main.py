@@ -129,7 +129,7 @@ class GraphTransformationInterface:
         src = graph.copy()
         pat = pattern.copy()
         self.GC.add_graph_to_collection(src, label='source', is_pattern=False)
-        print(pat.nodes(), pat.edges())
+        #print(pat.nodes(), pat.edges())
         #self.GC.add_graph_to_collection(pat, label='pattern', is_pattern=True)
         self.GC.transform(pat, number_of_transformations=number_of_transformations)
         return self.GC.G
