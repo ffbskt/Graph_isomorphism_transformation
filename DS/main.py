@@ -124,16 +124,37 @@ class GraphTransformationInterface:
     
     
     
-    def transform_graph(self, graph, pattern, number_of_transformations=1):
+    def transform_graph(self, pattern, number_of_transformations=1):
         """Applies a transformation using the given pattern graph."""
-        self.GC.clear()
-        src = graph.copy()
         pat = pattern.copy()
-        self.GC.add_graph_to_collection(src, label='source', is_pattern=False)
-        #print(pat.nodes(), pat.edges())
-        #self.GC.add_graph_to_collection(pat, label='pattern', is_pattern=True)
         self.GC.transform(pat, number_of_transformations=number_of_transformations)
         return self.GC.G
+    
+    def re_init(self):
+        self.GC.clear()
+        self.GC.add_graph_to_collection(self.source_graph.copy(), label='transformed', is_pattern=False)
+    
+    
+    def manual_experiment(self, epoches=10, steps=10): 
+        """Runs transformation experiment and logs results."""
+        self.GC.get_graph_to_collection_log(self.source_graph, reindex_map=None, message='Source graph')
+        self.GC.get_graph_to_collection_log(self.target_graph, reindex_map=None, message='Target graph')
+        matched_pairs_default = self.evaluate_similarity(self.source_graph)
+        for epoch in range(epoches):
+            self.re_init()
+            for step in range(steps):
+                pattern = self.patterns[np.random.randint(0, len(self.patterns))]
+                # self.GC.get_graph_to_collection_log(pattern, reindex_map=None, message='Pattern graph')
+                self.transform_graph(pattern, number_of_transformations=self.num_transformations)
+            matched_pairs = self.evaluate_similarity(self.GC.G)
+            self.transformation_results.append({
+                "Epoch": epoch,
+                "Matched Pairs": round(matched_pairs, 2),
+                "Default Matched Pairs": round(matched_pairs_default, 2)
+                #"Total Pairs": total_pairs
+            })
+            #VisG.visualize_transformation(self.source_graph, pattern, transformed_graph, "Transformation " + str(i))
+        VisG.visualize_transformation(self.source_graph, self.GC.G, self.target_graph, "Source, result, target end")
     
     def evaluate_similarity(self, graph):
         """Compares transformed graph with target graph, including node labels."""
@@ -150,25 +171,15 @@ class GraphTransformationInterface:
         matched_pairs = len(source_label_pairs & target_label_pairs)
 
         return matched_pairs/len(target_label_pairs)
-    
-    def run_experiment(self):
-        """Runs transformation experiment and logs results."""
-        self.GC.get_graph_to_collection_log(self.source_graph, reindex_map=None, message='Source graph')
-        self.GC.get_graph_to_collection_log(self.target_graph, reindex_map=None, message='Target graph')
-        matched_pairs_default = self.evaluate_similarity(self.source_graph)
-        for i, pattern in enumerate(self.patterns):
-            transformed_graph = self.source_graph.copy()
-            self.GC.get_graph_to_collection_log(pattern, reindex_map=None, message='Pattern graph')
-            transformed_graph = self.transform_graph(transformed_graph, pattern, number_of_transformations=self.num_transformations)
-            matched_pairs = self.evaluate_similarity(transformed_graph)
-            self.transformation_results.append({
-                #"Pattern": pattern,
-                "Matched Pairs": round(matched_pairs, 2),
-                "Default Matched Pairs": round(matched_pairs_default, 2)
-                #"Total Pairs": total_pairs
-            })
-            #VisG.visualize_transformation(self.source_graph, pattern, transformed_graph, "Transformation " + str(i))
-        VisG.visualize_transformation(self.source_graph, transformed_graph, self.target_graph, "Source, result, target end")
+
+    def get_cur_score():
+        return self.evaluate_similarity(self.GC.G)
+
+    def get_target(self):
+        return self.target_graph
+
+    def current_G(self):
+        return self.GC.G
     
     def get_results(self):
         for i, result in enumerate(self.transformation_results):
@@ -416,7 +427,7 @@ if __name__ == "__main__":
 
     # Example Usage
     interface = GraphTransformationInterface(num_patterns=30, num_transformations=10)
-    interface.run_experiment()
+    interface.manual_experiment()
     #interface.display_results()
     interface.get_results()
 

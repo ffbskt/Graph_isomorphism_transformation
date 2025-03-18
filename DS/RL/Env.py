@@ -2,66 +2,180 @@ import gymnasium as gym
 import numpy as np
 import networkx as nx
 from gymnasium import spaces
+import copy
+from sklearn.preprocessing import OneHotEncoder, LabelEncoder
+
+from DS.Trans_Interface.src_trg_interface import GraphTransformationInterface
+
 
 class GraphTransformationEnv(gym.Env):
     """
     Custom RL environment for transforming a graph G to match a target graph G_t.
     """
-    def __init__(self):
+    def __init__(self, TI: GraphTransformationInterface(), max_steps=100, node_categories=[1,0], edge_categories=['1', 'replacement']):
         super(GraphTransformationEnv, self).__init__()
-        
+        self.TI = TI
+        self.max_steps = max_steps
+        self.cur_steps = 0
+        self.node_categories = node_categories
+        self.edge_categories = edge_categories
+
         # Define observation space (example: adjacency matrices of G and G_t)
-        self.graph_size = 5  # Example fixed size
-        self.observation_space = spaces.Box(low=0, high=1, shape=(self.graph_size, self.graph_size, 2), dtype=np.float32)
-        
+        self.observation_space = spaces.Dict({
+            "x": spaces.Box(low=-np.inf, high=np.inf, shape=(100, 10), dtype=np.float32),  # Assume max 100 nodes
+            "edge_index": spaces.Box(low=0, high=100, shape=(2, 500), dtype=np.int64)  # Assume max 500 edges
+        })
         # Define action space (example: choosing an index of a transformation graph g_i)
-        self.num_actions = 10  # Example fixed number of transformations
+        self.num_actions = self.TI.get_number_of_patterns()  # Example fixed number of transformations
         self.action_space = spaces.Discrete(self.num_actions)
         
-        # Initialize graphs
-        self.G = nx.erdos_renyi_graph(self.graph_size, 0.5)  # Random starting graph
-        self.G_t = nx.erdos_renyi_graph(self.graph_size, 0.5)  # Random target graph
+        
         
     def reset(self):
         """Resets the environment to the initial state and returns the initial observation."""
-        self.G = nx.erdos_renyi_graph(self.graph_size, 0.5)  # Reset G
+        self.TI.re_init()
+        self.cur_steps = 0
         return self._get_observation()
 
     def step(self, action):
         """Applies transformation function based on the chosen action."""
-        
-        # Placeholder for actual transformation logic
-        # Right now, it just adds a random edge as a dummy transformation
-        edge = np.random.choice(self.graph_size, 2, replace=False)
-        self.G.add_edge(edge[0], edge[1])
+        self.TI.apply_pattern(action)
         
         # Compute reward (placeholder: negative difference in adjacency matrices)
-        reward = -np.sum(np.abs(nx.to_numpy_array(self.G) - nx.to_numpy_array(self.G_t)))
+        reward = self.TI.get_cur_score()
         
         # Check if task is complete
-        done = nx.to_numpy_array(self.G).tolist() == nx.to_numpy_array(self.G_t).tolist()
+        done = self.TI.get_cur_score() == 1 or self.cur_steps >= self.max_steps
         
+        self.cur_steps += 1
         return self._get_observation(), reward, done, {}
 
     def _get_observation(self):
         """Encodes G and G_t as an observation."""
-        obs_G = nx.to_numpy_array(self.G)
-        obs_Gt = nx.to_numpy_array(self.G_t)
-        return np.stack([obs_G, obs_Gt], axis=-1).astype(np.float32)
+        return graph_to_observation_with_edges(self.TI.get_current_G(), node_categories=self.node_categories, edge_categories=self.edge_categories)
+
+    #def graph2observation(self, graph):
+    #    return graph_to_observation_with_edges(graph, node_categories=None, edge_categories=None)
     
     def render(self, mode='human'):
         """Renders the current state of the graph (optional)."""
-        nx.draw(self.G, with_labels=True)
+        nx.draw(self.TI.get_current_G(), with_labels=True)
 
     def close(self):
         pass
 
-# Example usage:
-env = GraphTransformationEnv()
-obs = env.reset()
-for _ in range(5):
-    action = env.action_space.sample()  # Random action
-    obs, reward, done, _ = env.step(action)
-    print(f"Reward: {reward}, Done: {done}")
-    if done:
-        break
+
+
+def preprocess_categorical_features(G, node_attr='label', edge_attr='type', 
+                                    node_categories=None, edge_categories=None):
+    """
+    Converts categorical node and edge attributes into numerical float representations.
+    
+    Args:
+        G (networkx.Graph): The input graph.
+        node_attr (str): The node attribute to encode.
+        edge_attr (str): The edge attribute to encode.
+        node_categories (list, optional): Predefined node categories for one-hot encoding.
+        edge_categories (list, optional): Predefined edge categories for one-hot encoding.
+
+    Returns:
+        tuple: Processed node and edge features, and edge index list.
+    """
+    # Use provided categories or extract unique ones from the graph
+    if node_categories is None:
+        node_categories = list(set(nx.get_node_attributes(G, node_attr).values()))
+    if edge_categories is None:
+        edge_categories = list(set(nx.get_edge_attributes(G, edge_attr).values()))
+
+    # Create and fit encoders
+    node_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    edge_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    
+    node_encoder.fit(np.array(node_categories).reshape(-1, 1))
+    edge_encoder.fit(np.array(edge_categories).reshape(-1, 1))
+
+    # Encode nodes
+    node_features = []
+    for node in G.nodes():
+        category = G.nodes[node].get(node_attr, None)
+        if category is not None:
+            encoded = node_encoder.transform([[category]])[0]  # One-hot encoded vector
+        else:
+            encoded = np.zeros(len(node_categories))  # Default if missing
+        node_features.append(encoded)
+    
+    node_features = np.array(node_features, dtype=np.float32)
+
+    # Encode edges as additional nodes
+    edge_features = []
+    edge_index_list = []
+    edge_to_node_map = {}  # Mapping of (source, target) -> edge node index
+
+    edge_node_start_index = G.number_of_nodes()  # Start indexing edge nodes after original nodes
+
+    for edge_id, (src, tgt) in enumerate(G.edges()):
+        # Edge node index
+        edge_node_idx = edge_node_start_index + edge_id
+        edge_to_node_map[(src, tgt)] = edge_node_idx
+
+        # Extract edge features
+        category = G.edges[src, tgt].get(edge_attr, None)
+        if category is not None:
+            encoded = edge_encoder.transform([[category]])[0]
+        else:
+            encoded = np.zeros(len(edge_categories))  # Default if missing
+        edge_features.append(encoded)
+
+        # Connect edge node to its source and target nodes
+        edge_index_list.append([src, edge_node_idx])
+        edge_index_list.append([tgt, edge_node_idx])
+    
+    edge_features = np.array(edge_features, dtype=np.float32)
+
+    # Combine all node features (real nodes + edge nodes)
+    # SHeety features
+    # print('node_features', node_features)
+    # print('edge_features', edge_features) 
+    #print('x', G.nodes(data=True), G.edges(data=True))
+    x = np.vstack([node_features, edge_features]).astype(np.float32)
+
+    # Convert edge list to numpy array (shape: [2, num_edges])
+    edge_index = np.array(edge_index_list, dtype=np.int64).T
+
+    return x, edge_index
+
+def graph_to_observation_with_edges(G, node_categories, edge_categories):
+    """
+    Converts a networkx Graph to an RL observation, handling both node and edge categorical attributes.
+    
+    Returns:
+        dict: Observation dictionary with float-based node and edge features.
+    """
+    # Convert categorical features to numerical float format
+    x, edge_index = preprocess_categorical_features(G, node_categories=node_categories, edge_categories=edge_categories)
+
+    return {
+        'x': x,  # Processed node features
+        'edge_index': edge_index  # Edge list
+    }
+
+
+
+
+if __name__ == "__main__":
+    from DS.Logger.logger import JSONLogger
+    log = JSONLogger()
+    log.set_caller("Env")
+    # Example usage:
+    TI = GraphTransformationInterface(num_patterns=30, num_transformations=1)
+    env = GraphTransformationEnv(TI)
+    obs = env.reset()
+    print(TI.GC.G.nodes(data=True))
+
+    for i in range(10):
+        action = env.action_space.sample()  # Random action
+        obs, reward, done, _ = env.step(action)
+        #print(obs, env.TI.GC.G.nodes(data=True))
+        print(f"{i} Reward: {reward}, Done: {done}")
+        if done:
+            break
