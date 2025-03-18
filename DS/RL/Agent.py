@@ -12,6 +12,11 @@ import gymnasium as gym
 from gymnasium import spaces
 import numpy as np
 
+from DS.RL.Env import GraphTransformationEnv
+from DS.Trans_Interface.src_trg_interface import GraphTransformationInterface
+
+
+
 
 
 
@@ -52,27 +57,8 @@ if __name__ == '__main__':
     num_edges = 10
     num_actions = 10
 
-    class GraphEnv(gym.Env):
-        def __init__(self):
-            super(GraphEnv, self).__init__()
-            self.observation_space = spaces.Dict({
-                'x': spaces.Box(low=-1, high=1, shape=(num_nodes, num_node_features), dtype=np.float32),
-                'edge_index': spaces.Box(low=0, high=num_nodes, shape=(2, num_edges), dtype=np.int64)
-            })
-            self.action_space = spaces.Discrete(num_actions)
+    TI = GraphTransformationInterface(num_patterns=30, num_transformations=1)
+    env = GraphTransformationEnv(TI)
+    model = DQN(CustomDQNPolicy, env, verbose=1, buffer_size=50000) #, optimize_memory_usage=True)
 
-        def reset(self):
-            # Initialize graph data
-            x = np.random.randn(num_nodes, num_node_features).astype(np.float32)
-            edge_index = np.random.randint(0, num_nodes, (2, num_edges)).astype(np.int64)
-            return {'x': x, 'edge_index': edge_index}
-
-        def step(self, action):
-            # Implement environment dynamics
-            reward = 0
-            done = False
-            return self.reset(), reward, done, {}
-
-    env = GraphEnv()
-    model = DQN(CustomDQNPolicy, env, verbose=1)
     model.learn(total_timesteps=100)

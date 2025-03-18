@@ -22,8 +22,8 @@ class GraphTransformationEnv(gym.Env):
 
         # Define observation space (example: adjacency matrices of G and G_t)
         self.observation_space = spaces.Dict({
-            "x": spaces.Box(low=-np.inf, high=np.inf, shape=(100, 10), dtype=np.float32),  # Assume max 100 nodes
-            "edge_index": spaces.Box(low=0, high=100, shape=(2, 500), dtype=np.int64)  # Assume max 500 edges
+            "x": spaces.Box(low=-np.inf, high=np.inf, shape=(50, 10), dtype=np.float32),  # Assume max 100 nodes
+            "edge_index": spaces.Box(low=0, high=100, shape=(2, 200), dtype=np.int64)  # Assume max 500 edges
         })
         # Define action space (example: choosing an index of a transformation graph g_i)
         self.num_actions = self.TI.get_number_of_patterns()  # Example fixed number of transformations
@@ -31,7 +31,7 @@ class GraphTransformationEnv(gym.Env):
         
         
         
-    def reset(self):
+    def reset(self, seed=None, options=None):
         """Resets the environment to the initial state and returns the initial observation."""
         self.TI.re_init()
         self.cur_steps = 0
