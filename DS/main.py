@@ -5,6 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 from collections import deque
+import pandas as pd
 
 from DS.Space.Collections import GraphCollection, NodeCollection
 from DS.Space.Creations import compose_pattern
@@ -140,38 +141,39 @@ class GraphTransformationInterface:
             label_pairs = set()
             for u, v in G.edges():
                 label_pairs.add((G.nodes[u]['label'], G.nodes[v]['label']))
-                label_pairs.add((G.nodes[v]['label'], G.nodes[u]['label']))  # Ensure symmetry
+                # label_pairs.add((G.nodes[v]['label'], G.nodes[u]['label']))  # Ensure symmetry
             return label_pairs
 
         source_label_pairs = get_label_pairs(graph)
         target_label_pairs = get_label_pairs(self.target_graph)
 
         matched_pairs = len(source_label_pairs & target_label_pairs)
-        total_pairs = len(source_label_pairs)
 
-        return matched_pairs, total_pairs
+        return matched_pairs/len(target_label_pairs)
     
     def run_experiment(self):
         """Runs transformation experiment and logs results."""
         self.GC.get_graph_to_collection_log(self.source_graph, reindex_map=None, message='Source graph')
         self.GC.get_graph_to_collection_log(self.target_graph, reindex_map=None, message='Target graph')
+        matched_pairs_default = self.evaluate_similarity(self.source_graph)
         for i, pattern in enumerate(self.patterns):
             transformed_graph = self.source_graph.copy()
             self.GC.get_graph_to_collection_log(pattern, reindex_map=None, message='Pattern graph')
             transformed_graph = self.transform_graph(transformed_graph, pattern, number_of_transformations=self.num_transformations)
-            matched_pairs, total_pairs = self.evaluate_similarity(transformed_graph)
+            matched_pairs = self.evaluate_similarity(transformed_graph)
             self.transformation_results.append({
                 #"Pattern": pattern,
-                "Matched Pairs": matched_pairs,
+                "Matched Pairs": round(matched_pairs, 2),
+                "Default Matched Pairs": round(matched_pairs_default, 2)
                 #"Total Pairs": total_pairs
             })
             #VisG.visualize_transformation(self.source_graph, pattern, transformed_graph, "Transformation " + str(i))
         VisG.visualize_transformation(self.source_graph, transformed_graph, self.target_graph, "Source, result, target end")
     
     def get_results(self):
-        """Returns results as a pandas DataFrame."""
-        
-        return self.transformation_results
+        for i, result in enumerate(self.transformation_results):
+            print(i, result)
+        # return pd.DataFrame(self.transformation_results)
     
     def display_results(self):
         # df = self.get_results()
@@ -413,9 +415,10 @@ if __name__ == "__main__":
 
 
     # Example Usage
-    interface = GraphTransformationInterface(num_patterns=60)
+    interface = GraphTransformationInterface(num_patterns=30, num_transformations=10)
     interface.run_experiment()
-    interface.display_results()
+    #interface.display_results()
+    interface.get_results()
 
 
 
