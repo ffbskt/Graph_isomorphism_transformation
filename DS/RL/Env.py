@@ -74,31 +74,48 @@ class GraphTransformationEnv(gym.Env):
         return obs, info
         
     def step(self, action):
-        """Execute action and return new state"""
+        """Execute action and return new state with gradient rewards"""
+        # Get the previous score
+        prev_score = self.TI.get_cur_score()
+
         # Apply the transformation
         success = self.TI.apply_pattern(action)
-        
+
         # Get new observation
         obs = self._get_observation()
-        
-        # Calculate reward
-        reward = self.TI.get_cur_score()
-        
+
+        # Get updated score
+        cur_score = self.TI.get_cur_score()
+
+        # Reward system
+        reward = -0.1  # Default penalty for each step to encourage efficiency
+
+        if cur_score > prev_score:
+            reward += (cur_score - prev_score) * 5  # Reward improvement
+
+        if cur_score == 1:
+            reward += 10  # Large bonus for reaching the target
+
         # Check termination conditions
-        terminated = self.TI.get_cur_score() == 1  # Task completed
+        terminated = cur_score == 1  # Task completed
         truncated = self.cur_steps >= self.max_steps  # Max steps reached
-        
+        # if len(self.TI.get_current_G()) > len(self.TI.get_target())
+        if len(self.TI.get_current_G()) > len(self.TI.get_target()):
+            truncated = True
+            reward -= 100  # Large penalty for going over the target
+
         # Update step counter
         self.cur_steps += 1
-        
+
         # Create info dictionary
         info = {
             'success': success,
-            'score': self.TI.get_cur_score(),
+            'score': cur_score,
             'steps': self.cur_steps
         }
-        
+
         return obs, reward, terminated, truncated, info
+
         
     def _get_observation(self):
         """Convert current graph state to observation"""
@@ -161,7 +178,6 @@ class GraphTransformationEnv(gym.Env):
             pattern.add_edges_from(edges + common_edges)
             pattern.graph['pbase'] = nx.subgraph(pattern, [pbase])
             pattern.graph['phead'] = nx.subgraph(pattern, [phead])
-            print('1111111', pattern.graph['pbase'].nodes(data=True))
             self.TI.patterns.append(pattern)
 
 
@@ -295,13 +311,10 @@ if __name__ == "__main__":
     print('obs', obs, env.TI.get_cur_score())
     env.TI.print_graps()
 
-
-    obs, reward, terminated, truncated, info = env.step(5)
-    obs, reward, terminated, truncated, info = env.step(5)
-    obs, reward, terminated, truncated, info = env.step(4)
-    obs, reward, terminated, truncated, info = env.step(3)
-    obs, reward, terminated, truncated, info = env.step(4)
-    obs, reward, terminated, truncated, info = env.step(3)
+    for act in [5, 5, 4, 3, 4, 3]:
+        obs, reward, terminated, truncated, info = env.step(act)
+        print('---------obs', reward, env.TI.get_cur_score(), terminated, truncated)
+        env.TI.print_graps()
     
     print('obs', obs, reward, env.TI.get_cur_score())
     env.render()

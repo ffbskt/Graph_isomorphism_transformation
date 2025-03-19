@@ -11,6 +11,7 @@ import numpy as np
 
 from DS.RL.Env import GraphTransformationEnv
 from DS.Trans_Interface.src_trg_interface import GraphTransformationInterface
+from DS.RL.G2tourch import GraphTransitionModel
 
 
 class GNNFeatureExtractor(BaseFeaturesExtractor):
@@ -20,57 +21,73 @@ class GNNFeatureExtractor(BaseFeaturesExtractor):
         # Get input dimension from observation space
         n_node_features = observation_space.spaces['x'].shape[1]
         
-        # GNN layers
-        self.conv1 = GCNConv(n_node_features, 128)
-        self.conv2 = GCNConv(128, embedding_dim)
+        # Use GraphTransitionModel for feature extraction
+        self.gnn_model = GraphTransitionModel(
+            input_dim=n_node_features, 
+            hidden_dim=128, 
+            output_dim=embedding_dim,
+            num_layers=2
+        )
+        
+        # Additional processing if needed
+        self.fc = nn.Linear(embedding_dim, embedding_dim)
         self.relu = nn.ReLU()
-        self.dropout = nn.Dropout(0.1)
-
-    def _to_pyg_data(self, x, edge_index, batch_size=1):
-        """Convert numpy arrays or tensors to PyTorch Geometric Data format"""
-        # Convert to tensors if needed
-        if isinstance(x, np.ndarray):
-            x = torch.FloatTensor(x)
-        if isinstance(edge_index, np.ndarray):
-            edge_index = torch.LongTensor(edge_index)
-        
-        # Get device from the model's parameters
-        device = next(self.parameters()).device
-            
-        # Move to device
-        x = x.to(device)
-        edge_index = edge_index.to(device)
-        
-        # Handle batched input
-        if len(x.shape) == 3:  # Batched input
-            batch_size = x.shape[0]
-            x = x.view(-1, x.shape[-1])  # Flatten batch dimension
-            
-        # Create batch assignment
-        batch = torch.zeros(x.shape[0], dtype=torch.long, device=device)
-        if batch_size > 1:
-            nodes_per_graph = x.shape[0] // batch_size
-            for i in range(batch_size):
-                batch[i * nodes_per_graph:(i + 1) * nodes_per_graph] = i
-                
-        return Data(x=x, edge_index=edge_index, batch=batch)
 
     def forward(self, observations):
-        # Extract features from observations
-        x = observations['x']
-        edge_index = observations['edge_index']
+        # The model takes a dictionary with 'x' and 'edge_index' keys directly
+        # No need for separate _to_pyg_data conversion
         
-        # Convert to PyG format
-        data = self._to_pyg_data(x, edge_index)
-        
-        # Apply GNN layers
-        x = self.dropout(self.relu(self.conv1(data.x, data.edge_index)))
-        x = self.dropout(self.relu(self.conv2(x, data.edge_index)))
-        
-        # Global pooling to get graph-level representation
-        x = global_mean_pool(x, data.batch)
-        
-        return x
+        # Make sure we're working with dictionary input
+        if isinstance(observations, dict) and 'x' in observations and 'edge_index' in observations:
+            # Get features from the GraphTransitionModel
+            x = observations['x']
+            edge_index = observations['edge_index']
+            
+            # Convert to tensors with proper types if needed
+            if not isinstance(x, torch.Tensor):
+                x = torch.FloatTensor(x)
+            if not isinstance(edge_index, torch.Tensor):
+                edge_index = torch.LongTensor(edge_index)
+            else:
+                edge_index = edge_index.long()  # Ensure long type even if already tensor
+            
+            # Get device from the model's parameters and move tensors
+            device = next(self.parameters()).device
+            x = x.to(device)
+            edge_index = edge_index.to(device)
+            
+            # Handle batched input by processing each graph separately
+            if len(x.shape) == 3:  # Batched input [batch_size, num_nodes, features]
+                batch_size = x.shape[0]
+                embeddings = []
+                
+                for i in range(batch_size):
+                    # Process each graph in the batch
+                    single_graph = {
+                        'x': x[i],
+                        'edge_index': edge_index[i]
+                    }
+                    
+                    # Get embedding for this graph
+                    graph_embedding = self.gnn_model(single_graph)
+                    embeddings.append(graph_embedding)
+                
+                # Stack embeddings
+                embedding = torch.stack(embeddings)
+            else:
+                # Single graph processing
+                single_graph = {
+                    'x': x,
+                    'edge_index': edge_index
+                }
+                embedding = self.gnn_model(single_graph)
+                
+            # Additional processing if needed
+            embedding = self.relu(self.fc(embedding))
+            
+            return embedding
+        else:
+            raise ValueError("Observations must be a dictionary with 'x' and 'edge_index' keys")
 
 
 class CustomDQNPolicy(DQNPolicy):
@@ -87,8 +104,69 @@ class CustomDQNPolicy(DQNPolicy):
 if __name__ == '__main__':
     try:
         # Create environment
-        TI = GraphTransformationInterface(num_patterns=30, num_transformations=1)
+        TI = GraphTransformationInterface(num_patterns=3, num_transformations=1)
         env = GraphTransformationEnv(TI)
+        
+        # Wrap the environment to ensure consistent observation space
+        original_reset = env.reset
+        
+        def wrapped_reset(*args, **kwargs):
+            obs, info = original_reset(*args, **kwargs)
+            
+            # Pad node features to fixed size (50, 2) and truncate if necessary
+            if 'x' in obs:
+                num_nodes = min(obs['x'].shape[0], 50)  # Limit to 50 nodes
+                # Create padded array filled with zeros
+                padded_x = np.zeros((50, obs['x'].shape[1]), dtype=np.float32)
+                # Copy actual node features (truncate if more than 50)
+                padded_x[:num_nodes] = obs['x'][:num_nodes]
+                obs['x'] = padded_x
+            
+            # Ensure edge_index has valid indices and right shape
+            if 'edge_index' in obs:
+                # Only keep edges where both nodes exist and are within the 50-node limit
+                valid_edges = obs['edge_index'][:, obs['edge_index'][0] < num_nodes]
+                valid_edges = valid_edges[:, valid_edges[1] < num_nodes]
+                
+                # Pad edge_index to fixed size (2, 200)
+                padded_edge_index = np.zeros((2, 200), dtype=np.int64)
+                num_edges = min(valid_edges.shape[1], 200)  # Take at most 200 edges
+                padded_edge_index[:, :num_edges] = valid_edges[:, :num_edges]
+                obs['edge_index'] = padded_edge_index
+                
+            return obs, info
+        
+        env.reset = wrapped_reset
+        
+        original_step = env.step
+        
+        def wrapped_step(action):
+            obs, reward, terminated, truncated, info = original_step(action)
+            
+            # Pad node features to fixed size (50, 2) and truncate if necessary
+            if 'x' in obs:
+                num_nodes = min(obs['x'].shape[0], 50)  # Limit to 50 nodes
+                # Create padded array filled with zeros
+                padded_x = np.zeros((50, obs['x'].shape[1]), dtype=np.float32)
+                # Copy actual node features (truncate if more than 50)
+                padded_x[:num_nodes] = obs['x'][:num_nodes]
+                obs['x'] = padded_x
+            
+            # Ensure edge_index has valid indices and right shape
+            if 'edge_index' in obs:
+                # Only keep edges where both nodes exist and are within the 50-node limit
+                valid_edges = obs['edge_index'][:, obs['edge_index'][0] < num_nodes]
+                valid_edges = valid_edges[:, valid_edges[1] < num_nodes]
+                
+                # Pad edge_index to fixed size (2, 200)
+                padded_edge_index = np.zeros((2, 200), dtype=np.int64)
+                num_edges = min(valid_edges.shape[1], 200)  # Take at most 200 edges
+                padded_edge_index[:, :num_edges] = valid_edges[:, :num_edges]
+                obs['edge_index'] = padded_edge_index
+                
+            return obs, reward, terminated, truncated, info
+        
+        env.step = wrapped_step
         
         # Create model with proper hyperparameters
         model = DQN(
@@ -96,7 +174,7 @@ if __name__ == '__main__':
             env=env,
             learning_rate=1e-4,
             buffer_size=50000,
-            learning_starts=1000,
+            learning_starts=100,
             batch_size=32,
             tau=1.0,
             gamma=0.99,
@@ -115,7 +193,7 @@ if __name__ == '__main__':
         print("Starting training...")
         # Train the agent
         model.learn(
-            total_timesteps=50000,
+            total_timesteps=15000,
             log_interval=10,
             progress_bar=True
         )

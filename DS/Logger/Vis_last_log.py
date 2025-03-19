@@ -9,7 +9,7 @@ import argparse
 
 class LogReader:
     def __init__(self, log_file: str):
-        """Initialize LogVisualizer with a log file path.
+        """Initialize LogReader with a log file path.
 
         Parameters:
         -----------
@@ -147,8 +147,8 @@ if __name__ == "__main__":
     id_start = args.id_start
     id_end = args.id_end
 
-    # Create visualizer and get graphs
-    visualizer = LogReader(log_file)
+    # Create reader and get graphs
+    reader = LogReader(log_file)
     
     # Set up ids range if provided
     ids = None
@@ -156,10 +156,10 @@ if __name__ == "__main__":
         ids = range(args.id_start, args.id_end + 1)
     
     # Get last logs
-    last_logs = visualizer.get_last_n_logs(ids=ids, last_n=args.last_n, graphs_type=graphs_type)
+    last_logs = reader.get_last_n_logs(ids=ids, last_n=args.last_n, graphs_type=graphs_type)
     
     # Create graphs from logs
-    graphs = visualizer.create_graphs_from_log(last_logs)
+    graphs = reader.create_graphs_from_log(last_logs)
     
     # Visualize the sequence of graphs
     visual_plot = VisG()
