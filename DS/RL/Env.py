@@ -5,15 +5,19 @@ import networkx as nx
 from gymnasium import spaces
 import copy
 from sklearn.preprocessing import OneHotEncoder
+import matplotlib.pyplot as plt
+from DS.Visualisation.visg import VisG
 
 from DS.Trans_Interface.src_trg_interface import GraphTransformationInterface
 
 
 class GraphTransformationEnv(gym.Env):
     """Custom Environment for graph transformation tasks"""
-    def __init__(self, TI: GraphTransformationInterface(), max_steps=100, node_categories=[1,0], edge_categories=['1', 'replacement']):
+    def __init__(self, TI: GraphTransformationInterface(), max_steps=100, node_categories=[1,0], edge_categories=['1', 'replacement'], add_base_patterns=True):
         super().__init__()
         self.TI = TI
+        if add_base_patterns:
+            self.add_base_patterns()
         self.max_steps = max_steps
         self.cur_steps = 0
         self.node_categories = node_categories
@@ -102,85 +106,186 @@ class GraphTransformationEnv(gym.Env):
         G = self.TI.get_current_G()
         
         # Process graph features
-        x, edge_index = preprocess_graph_features(
+        observation = graph_to_observation_with_edges(
             G,
-            self.node_encoder,
-            self.edge_encoder,
-            max_nodes=self.observation_space.spaces['x'].shape[0],
-            max_edges=self.observation_space.spaces['edge_index'].shape[1]
+            self.node_categories,
+            self.edge_categories
         )
         
-        return {
-            'x': x,
-            'edge_index': edge_index
-        }
+        return observation
         
     def render(self, mode='human'):
-        """Render current graph state"""
-        nx.draw(self.TI.get_current_G(), with_labels=True)
+        """Render current graph state using VisG visualization"""
+        # Get the current graph and target graph
+        G = self.TI.get_current_G()
+        target_G = self.TI.get_target()
+        
+        # Create figure with two subplots
+        fig = plt.figure(figsize=(20, 8))
+        
+        # First subplot for current graph
+        ax1 = fig.add_subplot(1, 2, 1)
+        visg_current = VisG()
+        visg_current.set_graph(G)
+        visg_current.draw(layout='spring', title="Current Graph State", ax=ax1)
+        
+        # Second subplot for target graph
+        ax2 = fig.add_subplot(1, 2, 2)
+        visg_target = VisG()
+        visg_target.set_graph(target_G)
+        visg_target.draw(layout='spring', title="Target Graph State", ax=ax2)
+        
+        # Show the plot
+        plt.tight_layout()
+        plt.show()
+        
         
     def close(self):
         pass
 
 
-def preprocess_graph_features(G, node_encoder, edge_encoder, max_nodes=50, max_edges=200):
+    def add_base_patterns(self):
+        patterns = [
+            ([(0, {'type': 'T', 'label': 0}), (1, {'type': 'T', 'label': 1})], [(0, 1, {'type': '1', 'label': '1'})], 0, 1),
+            ([(0, {'type': 'T', 'label': 0}), (1, {'type': 'T', 'label': 0})], [(0, 1, {'type': '1', 'label': '1'})], 0, 1),
+            ([(0, {'type': 'T', 'label': 0}), (1, {'type': 'T', 'label': 1})], [(0, 1, {'type': 'replacement', 'label': 'Re'})], 0, 1),
+            ([(0, {'type': 'T', 'label': 1}), (1, {'type': 'T', 'label': 0})], [(0, 1, {'type': 'replacement', 'label': '1'})], 0, 1)
+        ]
+        
+        common_nodes = [('B', {'type': 'base', 'label': 'B'}), ('H', {'type': 'head', 'label': 'H'})]
+        common_edges = [('B', 0, {'type': 'hierarchy', 'label': '1'}), ('H', 1, {'type': 'hierarchy', 'label': '1'}), ('B', 'H', {'type': 1, 'label': '1'})]
+        
+        for nodes, edges, pbase, phead in patterns:
+            pattern = nx.DiGraph()
+            pattern.add_nodes_from(nodes + common_nodes)
+            pattern.add_edges_from(edges + common_edges)
+            pattern.graph['pbase'] = nx.subgraph(pattern, [pbase])
+            pattern.graph['phead'] = nx.subgraph(pattern, [phead])
+            print('1111111', pattern.graph['pbase'].nodes(data=True))
+            self.TI.patterns.append(pattern)
+
+
+
+def preprocess_categorical_features(G, node_attr='label', edge_attr='type', 
+                                    node_categories=None, edge_categories=None):
     """
-    Process graph features into format suitable for GNN.
+    Converts categorical node and edge attributes into numerical float representations.
     
     Args:
-        G: NetworkX graph
-        node_encoder: Fitted OneHotEncoder for node features
-        edge_encoder: Fitted OneHotEncoder for edge features
-        max_nodes: Maximum number of nodes to pad/truncate to
-        max_edges: Maximum number of edges to pad/truncate to
-        
+        G (networkx.Graph): The input graph.
+        node_attr (str): The node attribute to encode.
+        edge_attr (str): The edge attribute to encode.
+        node_categories (list, optional): Predefined node categories for one-hot encoding.
+        edge_categories (list, optional): Predefined edge categories for one-hot encoding.
+
     Returns:
-        tuple: (node_features, edge_index)
+        tuple: Processed node and edge features, and edge index list.
     """
-    # Extract and encode node features
+    # Use provided categories or extract unique ones from the graph
+    
+    if node_categories is None:
+        node_categories = list(set(nx.get_node_attributes(G, node_attr).values()))
+    if edge_categories is None:
+        edge_categories = list(set(nx.get_edge_attributes(G, edge_attr).values()))
+
+    # Create and fit encoders
+    node_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    edge_encoder = OneHotEncoder(sparse_output=False, handle_unknown='ignore')
+    
+    node_encoder.fit(np.array(node_categories).reshape(-1, 1))
+    edge_encoder.fit(np.array(edge_categories).reshape(-1, 1))
+
+    # Encode nodes
     node_features = []
     for node in G.nodes():
-        category = G.nodes[node].get('label', None)
+        category = G.nodes[node].get(node_attr, None)
         if category is not None:
-            encoded = node_encoder.transform([[category]])[0]
+            encoded = node_encoder.transform([[category]])[0]  # One-hot encoded vector
         else:
-            encoded = np.zeros(node_encoder.n_features_in_)
+            encoded = np.zeros(len(node_categories))  # Default if missing
         node_features.append(encoded)
     
-    # Convert to numpy array
     node_features = np.array(node_features, dtype=np.float32)
+
+    # Encode edges as additional nodes
+    edge_features = []
+    edge_index_list = []
+    edge_to_node_map = {}  # Mapping of (source, target) -> edge node index
+
+    edge_node_start_index = G.number_of_nodes()  # Start indexing edge nodes after original nodes
+
+    for edge_id, (src, tgt) in enumerate(G.edges()):
+        # Edge node index
+        edge_node_idx = edge_node_start_index + edge_id
+        edge_to_node_map[(src, tgt)] = edge_node_idx
+
+        # Extract edge features
+        category = G.edges[src, tgt].get(edge_attr, None)
+        if category is not None:
+            encoded = edge_encoder.transform([[category]])[0]
+        else:
+            encoded = np.zeros(len(edge_categories))  # Default if missing
+        edge_features.append(encoded)
+
+        # Connect edge node to its source and target nodes
+        edge_index_list.append([src, edge_node_idx])
+        edge_index_list.append([tgt, edge_node_idx])
     
-    # Pad or truncate node features
-    if len(node_features) < max_nodes:
-        padding = np.zeros((max_nodes - len(node_features), node_features.shape[1]))
-        node_features = np.vstack([node_features, padding])
-    else:
-        node_features = node_features[:max_nodes]
-    
-    # Extract and process edges
-    edge_list = []
-    for src, tgt in G.edges():
-        if src < max_nodes and tgt < max_nodes:  # Only include edges between valid nodes
-            edge_list.append([src, tgt])
-    
-    # Convert to numpy array and ensure correct shape
-    if edge_list:
-        edge_index = np.array(edge_list, dtype=np.int64).T  # Shape: [2, num_edges]
-    else:
-        edge_index = np.zeros((2, 0), dtype=np.int64)
-    
-    # Pad or truncate edge index
-    if edge_index.shape[1] < max_edges:
-        padding = np.zeros((2, max_edges - edge_index.shape[1]), dtype=np.int64)
-        edge_index = np.hstack([edge_index, padding])
-    else:
-        edge_index = edge_index[:, :max_edges]
-    
-    return node_features, edge_index
+    edge_features = np.array(edge_features, dtype=np.float32)
+
+    # Combine all node features (real nodes + edge nodes)
+    # SHeety features
+    # print('node_features', node_features)
+    # print('edge_features', edge_features) 
+    #print('x', G.nodes(data=True), G.edges(data=True))
+    x = np.vstack([node_features, edge_features]).astype(np.float32)
+
+    # Convert edge list to numpy array (shape: [2, num_edges])
+    edge_index = np.array(edge_index_list, dtype=np.int64).T
+
+    return x, edge_index
+
+def graph_to_observation_with_edges(G, node_categories, edge_categories):
+    """Converts a networkx Graph to an RL observation, ensuring correct format."""
+    x, edge_index = preprocess_categorical_features(G, node_categories=node_categories, edge_categories=edge_categories)
+
+    return {
+        'x': np.array(x, dtype=np.float32),  # Convert tensors to NumPy arrays
+        'edge_index': np.array(edge_index, dtype=np.int64)
+    }
+
 
 
 if __name__ == "__main__":
     # Test environment
+    from DS.Logger.logger import JSONLogger
+    import matplotlib.pyplot as plt
+    log = JSONLogger()
+    log.set_caller("Env")
+    
+    # Create and initialize environment
+    TI = GraphTransformationInterface(num_patterns=3, num_transformations=1)
+    env = GraphTransformationEnv(TI)    
+    
+    env.TI.print_graps()
+    obs, info = env.reset()
+    print('obs', obs, env.TI.get_cur_score())
+    env.TI.print_graps()
+
+
+    obs, reward, terminated, truncated, info = env.step(5)
+    obs, reward, terminated, truncated, info = env.step(5)
+    obs, reward, terminated, truncated, info = env.step(4)
+    obs, reward, terminated, truncated, info = env.step(3)
+    obs, reward, terminated, truncated, info = env.step(4)
+    obs, reward, terminated, truncated, info = env.step(3)
+    
+    print('obs', obs, reward, env.TI.get_cur_score())
+    env.render()
+ 
+
+
+    """
     try:
         from DS.Logger.logger import JSONLogger
         log = JSONLogger()
@@ -199,20 +304,23 @@ if __name__ == "__main__":
         # Run test episode
         total_reward = 0
         for i in range(10):
-            action = env.action_space.sample()
+            action = env.action_space.sample()  # Random action
             obs, reward, terminated, truncated, info = env.step(action)
             total_reward += reward
             
-            print(f"\nStep {i}:")
+            print(f"\nStep {i+1}:")
             print(f"Action: {action}")
             print(f"Reward: {reward:.4f}")
             print(f"Success: {info['success']}")
+            print(f"Score: {info['score']:.4f}")
             
             if terminated or truncated:
-                print("\nEpisode ended")
+                print("\nEpisode terminated early")
                 break
                 
         print(f"\nTotal reward: {total_reward:.4f}")
+
+        env.TI.print_graps()
         
     except Exception as e:
         print(f"An error occurred: {e}")
@@ -221,3 +329,4 @@ if __name__ == "__main__":
     finally:
         env.close()
         print("\nEnvironment closed.")
+    """

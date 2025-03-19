@@ -106,3 +106,10 @@ class GraphTransformationInterface:
         # import ace_tools as tools
         # tools.display_dataframe_to_user("Transformation Results", df)
         print(self.transformation_results)
+
+    def print_graps(self):
+        print('src: ', [self.source_graph.nodes[i]['label'] for i in self.source_graph.nodes()], self.source_graph.edges())
+        print('target: ', [self.target_graph.nodes[i]['label'] for i in self.target_graph.nodes()], self.target_graph.edges())
+        for p in self.patterns:
+            mp = {1:'1', '1': '1', 'replacement': 'r', 'hierarchy': 'h'}
+            print('pattern: ', [p.nodes[i]['label'] for i in p.nodes()], [(i, mp[p.edges()[i]['type']]) for i in p.edges()])
