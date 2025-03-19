@@ -259,14 +259,37 @@ def graph_to_observation_with_edges(G, node_categories, edge_categories):
 if __name__ == "__main__":
     # Test environment
     from DS.Logger.logger import JSONLogger
-    import matplotlib.pyplot as plt
     log = JSONLogger()
     log.set_caller("Env")
     
     # Create and initialize environment
     TI = GraphTransformationInterface(num_patterns=3, num_transformations=1)
     env = GraphTransformationEnv(TI)    
+
+    def get_default_src():
+        G = nx.DiGraph()
+        nodes = [(4, {'type': 'T', 'label': 0}), (6, {'type': 'T', 'label': 0}), (10, {'type': 'T', 'label': 0})]
+        edges = [(4, 6, {'type': '1', 'label': '1'}), (6, 10, {'type': '1', 'label': '1'})]
+        G.add_nodes_from(nodes)
+        G.add_edges_from(edges)
+        return G
+
+    def get_default_trg():
+        G = nx.DiGraph()
+        nodes = [(0, {'type': 'T', 'label': 1}), (1, {'type': 'T', 'label': 1}), (2, {'type': 'T', 'label': 0}), (3, {'type': 'T', 'label': 1}), 
+                (4, {'type': 'T', 'label': 0}), (5, {'type': 'T', 'label': 0}), (6, {'type': 'T', 'label': 1}), (7, {'type': 'T', 'label': 0}), 
+                (8, {'type': 'T', 'label': 0}), (9, {'type': 'T', 'label': 0})]
+        edges = [(0, 3, {'type': 'replacement', 'label': '1'}), (0, 6, {'type': '1', 'label': '1'}), (2, 4, {'type': 'replacement', 'label': '1'}), 
+                (5, 2, {'type': 'replacement', 'label': '1'}), (5, 9, {'type': '1', 'label': '1'}), (7, 6, {'type': 'replacement', 'label': '1'}), 
+                (8, 0, {'type': 'replacement', 'label': '1'}), (8, 7, {'type': '1', 'label': '1'})]
+        G.add_nodes_from(nodes)
+        G.add_edges_from(edges)
+        return G
+
     
+    env.TI.source_graph = get_default_src()
+    env.TI.target_graph = get_default_trg()
+    env.TI.re_init()
     env.TI.print_graps()
     obs, info = env.reset()
     print('obs', obs, env.TI.get_cur_score())
@@ -283,7 +306,8 @@ if __name__ == "__main__":
     print('obs', obs, reward, env.TI.get_cur_score())
     env.render()
  
-
+    # print(env.TI.get_current_G().nodes(data=True), env.TI.get_current_G().edges(data=True))
+    # print(env.TI.get_target().nodes(data=True), env.TI.get_target().edges(data=True))
 
     """
     try:
