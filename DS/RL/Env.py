@@ -1,3 +1,4 @@
+import torch
 import gymnasium as gym
 import numpy as np
 import networkx as nx
@@ -32,23 +33,27 @@ class GraphTransformationEnv(gym.Env):
         
         
     def reset(self, seed=None, options=None):
-        """Resets the environment to the initial state and returns the initial observation."""
+        """Resets the environment to the initial state and returns the initial observation correctly formatted."""
         self.TI.re_init()
         self.cur_steps = 0
-        return self._get_observation()
+        obs = self._get_observation()
+        return obs, {}  # ✅ Return a tuple: (obs, info)
 
     def step(self, action):
         """Applies transformation function based on the chosen action."""
         self.TI.apply_pattern(action)
         
-        # Compute reward (placeholder: negative difference in adjacency matrices)
+        # Compute reward
         reward = self.TI.get_cur_score()
         
-        # Check if task is complete
+        # Check termination condition
         done = self.TI.get_cur_score() == 1 or self.cur_steps >= self.max_steps
         
         self.cur_steps += 1
-        return self._get_observation(), reward, done, {}
+        obs = self._get_observation()
+        
+        return obs, reward, done, {}, {}  # ✅ Return a tuple (obs, reward, done, truncated, info)
+
 
     def _get_observation(self):
         """Encodes G and G_t as an observation."""
@@ -145,20 +150,13 @@ def preprocess_categorical_features(G, node_attr='label', edge_attr='type',
     return x, edge_index
 
 def graph_to_observation_with_edges(G, node_categories, edge_categories):
-    """
-    Converts a networkx Graph to an RL observation, handling both node and edge categorical attributes.
-    
-    Returns:
-        dict: Observation dictionary with float-based node and edge features.
-    """
-    # Convert categorical features to numerical float format
+    """Converts a networkx Graph to an RL observation, ensuring correct format."""
     x, edge_index = preprocess_categorical_features(G, node_categories=node_categories, edge_categories=edge_categories)
 
     return {
-        'x': x,  # Processed node features
-        'edge_index': edge_index  # Edge list
+        'x': np.array(x, dtype=np.float32),  # ✅ Convert tensors to NumPy arrays
+        'edge_index': np.array(edge_index, dtype=np.int64)
     }
-
 
 
 
@@ -174,8 +172,8 @@ if __name__ == "__main__":
 
     for i in range(10):
         action = env.action_space.sample()  # Random action
-        obs, reward, done, _ = env.step(action)
-        #print(obs, env.TI.GC.G.nodes(data=True))
+        obs, reward, done, _, _ = env.step(action)
+        print(obs, reward, done)
         print(f"{i} Reward: {reward}, Done: {done}")
         if done:
             break
