@@ -102,6 +102,8 @@ class CustomDQNPolicy(DQNPolicy):
 
 
 if __name__ == '__main__':
+    from DS.Logger.logger import JSONLogger
+    JSONLogger().disable_logging()
     try:
         # Create environment
         TI = GraphTransformationInterface(num_patterns=3, num_transformations=1)
@@ -174,7 +176,7 @@ if __name__ == '__main__':
             env=env,
             learning_rate=1e-4,
             buffer_size=50000,
-            learning_starts=100,
+            learning_starts=50,
             batch_size=32,
             tau=1.0,
             gamma=0.99,

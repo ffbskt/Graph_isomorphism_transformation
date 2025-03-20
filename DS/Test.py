@@ -13,6 +13,7 @@
 import unittest
 import sys
 import os
+from DS.Logger.logger import JSONLogger
 
 # Ensure Test_ directory is in the path
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))

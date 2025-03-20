@@ -6,7 +6,7 @@ import networkx as nx
 import pandas as pd
 from DS.Space.Collections import GraphCollection
 from DS.Visualisation.visg import VisG
-
+from collections import Counter
 
 
 
@@ -66,20 +66,55 @@ class GraphTransformationInterface:
         VisG.visualize_transformation(self.source_graph, self.GC.G, self.target_graph, "Source, result, target end")
     
     def evaluate_similarity(self, graph):
-        """Compares transformed graph with target graph, including node labels."""
-        def get_label_pairs(G):
-            label_pairs = set()
+        pair_set_similarity = self._label_pair_frequency_similarity(graph)
+        return pair_set_similarity
+        # edit_distance = self.edit_distance_similarity(graph)
+        # return edit_distance
+
+    
+
+    
+
+    def _label_pair_frequency_similarity(self, graph):
+        """Compares frequency of label pairs in edges between graphs."""
+
+        def get_label_pair_counts(G):
+            counts = Counter()
             for u, v in G.edges():
-                label_pairs.add((G.nodes[u]['label'], G.nodes[v]['label']))
-                # label_pairs.add((G.nodes[v]['label'], G.nodes[u]['label']))  # Ensure symmetry
-            return label_pairs
+                pair = (G.nodes[u]['label'], G.nodes[v]['label'])
+                counts[pair] += 1
+            return counts
 
-        source_label_pairs = get_label_pairs(graph)
-        target_label_pairs = get_label_pairs(self.target_graph)
+        source_counts = get_label_pair_counts(graph)
+        target_counts = get_label_pair_counts(self.target_graph)
 
-        matched_pairs = len(source_label_pairs & target_label_pairs)
+        all_pairs = set(source_counts.keys()).union(target_counts.keys())
+        total_diff = sum(abs(source_counts[pair] - target_counts[pair]) for pair in all_pairs)
+        total_edges = sum(target_counts.values())
 
-        return matched_pairs/len(target_label_pairs)
+        similarity = 1 - (total_diff / (2 * total_edges)) if total_edges else 1.0
+
+        return similarity
+
+
+
+    def edit_distance_similarity(self, graph):
+        """Normalized graph edit distance similarity measure."""
+        def node_subst_cost(n1, n2):
+            return 0 if n1['label'] == n2['label'] else 1
+        
+        ged = nx.graph_edit_distance(graph, self.target_graph,
+                                    node_subst_cost=node_subst_cost,
+                                    timeout=0.5)  # limit to 0.5s to avoid excessive computation
+        
+        if ged is None:
+            return 0.0  # timed out, assume worst similarity
+        
+        max_possible_distance = max(graph.number_of_nodes() + graph.number_of_edges(),
+                                    self.target_graph.number_of_nodes() + self.target_graph.number_of_edges())
+        similarity = 1 - (ged / max_possible_distance)
+        return max(0.0, similarity)  # ensure non-negative
+
 
     def get_cur_score(self):
         return self.evaluate_similarity(self.GC.G)

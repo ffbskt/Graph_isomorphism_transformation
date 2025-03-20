@@ -84,6 +84,7 @@ def create_random_edge_list(base_nodes, head_nodes, num_connect_edges=None, edge
         edges.append((src, dst, {'type': edges_types, 'label': edges_types[:2]}))
     return edges
 
+
 def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1, num_edges_base=0, 
                          num_connect_edges=1, edges_types=['replacement', '1'],
                          node_types_base=None, edge_types_base=None, 
@@ -118,4 +119,5 @@ def create_random_pattern(num_phead_nodes=2, num_edges_head=2, num_pbase_nodes=1
     
     edges = create_random_edge_list(pbase.nodes(), phead.nodes(), num_connect_edges, edges_types)
     return compose_pattern(phead, pbase, edges)
+
 
